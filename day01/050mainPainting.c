@@ -11,8 +11,12 @@ Compile with:
 #include <GLFW/glfw3.h>
 #include "040pixel.h"
 
+#define max(x, y) (((x) > (y)) ? (x) : (y))
+#define min(x, y) (((x) < (y)) ? (x) : (y))
+
 double red = 1.0, green = 1.0, blue = 1.0;
 int mouseIsDown = 0;
+int size = 1;
 
 void handleKeyDown(int key, int shiftIsDown, int controlIsDown,
         int altOptionIsDown, int superCommandIsDown) {
@@ -35,6 +39,14 @@ void handleKeyDown(int key, int shiftIsDown, int controlIsDown,
         red = 1.0, green = 1.0, blue = 1.0;
     else if (key == GLFW_KEY_Q) //clear the screen
         pixClearRGB(0.0, 0.0, 0.0);
+    else if (key == GLFW_KEY_UP){ //increase brush size
+        size++;
+        size = min(size, 10); //prevent size above 10
+    }
+    else if (key == GLFW_KEY_DOWN){ //decrease brush size
+        size--;
+        size = max(size, 1); //prevent size below 1
+    }
 
 
 }
@@ -42,7 +54,7 @@ void handleKeyDown(int key, int shiftIsDown, int controlIsDown,
 
 void handleMouseUp(double x, double y, int button, int shiftIsDown, 
         int controlIsDown, int altOptionIsDown, int superCommandIsDown) {
-            
+
         mouseIsDown = 0;
 }
 
@@ -55,8 +67,18 @@ void handleMouseDown(double x, double y, int button, int shiftIsDown,
 /* paints pixel if the mouse is held down */
 void handleMouseMove(double x, double y) {
 
-    if (mouseIsDown == 1)
-        pixSetRGB(x,y, red, green, blue);
+    if (mouseIsDown == 1){
+
+        /*paints square centered around pixel of mouse of hight/width 2*size */
+        for(int r = 0; r < size; r++){
+            for(int c = 0; c < size; c++){
+                pixSetRGB(x-c, y-r, red, green, blue);
+                pixSetRGB(x-c, y+r, red, green, blue);
+                pixSetRGB(x+c, y-r, red, green, blue);
+                pixSetRGB(x+c, y+r, red, green, blue);
+            }
+        }
+    }
 }
 
 
