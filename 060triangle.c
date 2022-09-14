@@ -30,8 +30,28 @@ void triRenderWithAleft(
 
 
     }
-    // else
-    //     break;
+    else // b is below a
+
+        if (a0 != b0){ //render left half
+            for (int x0 = (int) ceil(a0); x0 <= floor(b0); x0++){
+                int bottom = (int) ceil(a1 + (b1-a1) / (b0 - a0) * (x0 - a0));
+                int top = (int) floor(a1 + (c1-a1) / (c0 - a0) * (x0 - a0));
+
+                for (int x1 = bottom; x1 <= top; x1++)
+                    pixSetRGB(x0, x1, r, g, b);
+                
+            }
+        }
+
+        if (b0 != c0){
+            for (int x0 = (int) floor(b0) + 1; x0 <= floor(c0); x0++){
+                int bottom = (int) ceil(b1 + (c1-b1) / (c0 - b0) * (x0 - b0));
+                int top = (int) floor(a1 + (c1-a1) / (c0 - a0) * (x0 - a0));
+
+                for (int x1 = bottom; x1 <= top; x1++)
+                    pixSetRGB(x0, x1, r, g, b);
+            }
+        }
 }
 
 void triRender(

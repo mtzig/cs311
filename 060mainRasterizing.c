@@ -27,7 +27,7 @@ int main(void) {
     /* Clear the window to black. */
     pixClearRGB(0.0, 0.0, 0.0);
 
-    triRender(50,50, 60, 60, 50, 90,1,0,0);
+    triRender(50,50, 60, 30, 70, 40,1,0,0);
 
     pixRun();
 
