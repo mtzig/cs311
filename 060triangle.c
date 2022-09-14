@@ -2,19 +2,6 @@
 #include <math.h>
 
 
-void triRender(
-        double a0, double a1, double b0, double b1, double c0, double c1, 
-        double r, double g, double b) {
-    if (a0 <= b0 && a0 <= c0)
-        triRenderWithAleft(a0, a1, b0, b1, c0, c1, r, g, b);
-    else if (b0 <= a0 && b0 <= c0)
-        triRenderWithAleft(b0, b1, c0, c1, a0, a1, r, g, b);
-    else
-        triRenderWithAleft(c0, c1, a0, a1, b0, b1, r, g, b);
-	
-}
-
-
 void triRenderWithAleft(
         double a0, double a1, double b0, double b1, double c0, double c1, 
         double r, double g, double b) {
@@ -43,6 +30,19 @@ void triRenderWithAleft(
 
 
     }
-    else
-        return 0;
+    // else
+    //     break;
 }
+
+void triRender(
+        double a0, double a1, double b0, double b1, double c0, double c1, 
+        double r, double g, double b) {
+    if (a0 <= b0 && a0 <= c0)
+        triRenderWithAleft(a0, a1, b0, b1, c0, c1, r, g, b);
+    else if (b0 <= a0 && b0 <= c0)
+        triRenderWithAleft(b0, b1, c0, c1, a0, a1, r, g, b);
+    else
+        triRenderWithAleft(c0, c1, a0, a1, b0, b1, r, g, b);
+	
+}
+
