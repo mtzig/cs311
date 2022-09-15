@@ -21,7 +21,7 @@ Compile with:
 
 int main(void) {
  
-    if (pixInitialize(512, 512, "Pixel Graphics") != 0)
+    if (pixInitialize(512, 512, "Rasterizer") != 0)
         return 1;
 
     /* Clear the window to black. */
