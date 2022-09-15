@@ -5,7 +5,7 @@
 void triRenderWithAleft(
         double a0, double a1, double b0, double b1, double c0, double c1, 
         double r, double g, double b) {
-    if (a1 < c1){ // c is above a
+    if (a0 <=c0 && c0 <= b0){ // c is above a
 
         if (a0 != c0){ //render left half
             for (int x0 = (int) ceil(a0); x0 <= floor(c0); x0++){
