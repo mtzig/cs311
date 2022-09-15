@@ -2,8 +2,11 @@
 Thomas Zeng
 9/14/22
 
+Draws a few triangles using 060triangle.c
+
 Compile with:
     clang 060mainRasterizing.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
+
 
  */
 
@@ -64,6 +67,18 @@ int main(void) {
             B
     */
     triRender(400,400,500,350, 450,400,1,1,1);
+
+    /* triange with different permutation of vertices
+        should not see any difference in output
+    */
+    triRender(500,350, 450,400, 400,400,1,1,1);
+    triRender(450,400, 400,400, 500,350,1,1,1);
+
+    /*
+            C
+    A --- B
+    */
+    triRender(200,100,250,100, 300,260,1,1,1);
 
 
     pixRun();
