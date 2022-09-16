@@ -1,4 +1,4 @@
-
+#include <math.h>
 
 
 /*** 2 x 2 Matrices ***/
@@ -18,6 +18,17 @@ matrix is not invertible, and mInv is untouched. If the determinant is not 0.0,
 then the matrix is invertible, and its inverse is placed into mInv. The output 
 CANNOT safely alias the input. */
 double mat22Invert(const double m[2][2], double mInv[2][2]) {
+    double det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+    if (det != 0){
+        mInv[0][0] = m[1][1] / det;
+        mInv[0][1] = -m[0][1] / det;
+        mInv[1][0] = -m[1][0] / det;
+        mInv[1][1] = m[0][1] / det;
+    }
+
+
+    return det;
+
     
 }
 
@@ -25,12 +36,19 @@ double mat22Invert(const double m[2][2], double mInv[2][2]) {
 The output CANNOT safely alias the input. */
 void mat221Multiply(const double m[2][2], const double v[2], 
         double mTimesV[2]) {
-    
+
+    mTimesV[0] = m[0][0] * v[0] + m[0][1] * v[1];
+    mTimesV[1] = m[1][0] * v[0] + m[1][1] * v[1];
 }
 
 /* Fills the matrix m from its two columns. The output CANNOT safely alias the 
 input. */
 void mat22Columns(const double col0[2], const double col1[2], double m[2][2]) {
+    m[0][0] = col0[0];
+    m[1][0] = col0[1];
+
+    m[0][1] = col1[0];
+    m[1][1] = col1[1];
     
 }
 
@@ -38,7 +56,10 @@ void mat22Columns(const double col0[2], const double col1[2], double m[2][2]) {
 rotation matrix corresponding to counterclockwise rotation of the plane through 
 the angle theta. */
 void mat22Rotation(double theta, double m[2][2]) {
-    
+    m[0][0] = cos(theta);
+    m[0][1] = -sin(theta);
+    m[1][0] = sin(theta);
+    m[1][1] = cos(theta);
 }
 
 
