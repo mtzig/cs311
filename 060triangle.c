@@ -3,8 +3,8 @@
 
 
 /*
-Creates point-slope equation on (i0, i1), (j0, j1)
-Calculates value on x0
+Creates point-slope equation with points (i0, i1), (j0, j1)
+returns value on input x0
  */
 double pointSlope(double x0, double i0, double i1, double j0, double j1){
     return i1 + (j1-i1) / (j0 - i0) * (x0 - i0);
