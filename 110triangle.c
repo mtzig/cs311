@@ -10,14 +10,22 @@ double pointSlope(double x0, const double i[2], const double j[2]){
     return i[1] + (j[1]-i[1]) / (j[0] - i[0]) * (x0 - i[0]);
 }
 
+
+/* 
+Calculates [p, q] as A^-1 (x-a)
+Interpolates as p(beta-alpha) + q(gamma-alpha) + alpha
+Modulates with RGB
+Draws pixel
+
+*/
 void pixSetInterpolate(double x0, double x1, const double a[2], const double bMa[2], 
          const double cMa[2], const double A_I[2][2], const double alpha[3], const double betaMalpha[3], 
          const double gammaMalpha[3], const double rgb[3]){
 
             double xMa[2] = {x0 - a[0], x1 - a[1]};
 
+            /*Calculate p and q*/
             double pq[2]; //vector to hold value of p and q
-
             mat221Multiply(A_I, xMa, pq);
 
             double rgb_int[3]; //vector for interpolated and modulated rgb
