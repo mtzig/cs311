@@ -120,9 +120,9 @@ void triRender(
     if (a[0] <= b[0] && a[0] <= c[0])
         triRenderWithAleft(a, b, c, rgb, alpha, beta, gamma);
     else if (b[0] <= a[0] && b[0] <= c[0])
-        triRenderWithAleft(b, c, a, rgb, alpha, beta, gamma);
+        triRenderWithAleft(b, c, a, rgb, beta, gamma, alpha);
     else
-        triRenderWithAleft(c, a, b, rgb, alpha, beta, gamma);
+        triRenderWithAleft(c, a, b, rgb, gamma, alpha, beta);
 	
 }
 

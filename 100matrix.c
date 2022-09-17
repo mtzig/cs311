@@ -23,7 +23,7 @@ double mat22Invert(const double m[2][2], double mInv[2][2]) {
         mInv[0][0] = m[1][1] / det;
         mInv[0][1] = -m[0][1] / det;
         mInv[1][0] = -m[1][0] / det;
-        mInv[1][1] = m[0][1] / det;
+        mInv[1][1] = m[0][0] / det;
     }
 
 

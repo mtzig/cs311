@@ -20,9 +20,9 @@ double c[2] = {-226.0, -226.0};
 double rgb[3] = {1.0, 1.0, 0.0};
 double angle = 0.0;
 
-double alpha[3] = {1, 0, 0};
-double beta[3] = {0, 1, 0}; 
-double gamma[3] = {0, 0, 1};
+double alpha[3] = {1.0, 0.0, 0.0};
+double beta[3] = {0.0, 1.0, 0.0}; 
+double gamma[3] = {0.0, 0.0, 1.0};
 
 void handleTimeStep(double oldTime, double newTime) {
     if (floor(newTime) - floor(oldTime) >= 1.0)
@@ -43,7 +43,7 @@ void handleTimeStep(double oldTime, double newTime) {
 }
 
 int main(void) {
-    if (pixInitialize(512, 512, "Testing") != 0)
+    if (pixInitialize(512, 512, "Interpolator") != 0)
         return 1;
     pixSetTimeStepHandler(handleTimeStep);
     pixRun();
