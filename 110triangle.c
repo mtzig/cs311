@@ -18,9 +18,9 @@ Modulates with RGB
 Draws pixel
 
 */
-void pixSetInterpolate(double x0, double x1, const double a[2], const double bMa[2], 
-         const double cMa[2], const double A_I[2][2], const double alpha[3], const double betaMalpha[3], 
-         const double gammaMalpha[3], const double rgb[3]){
+void pixSetInterpolate(double x0, double x1, const double a[2], const double A_I[2][2], 
+                       const double alpha[3], const double betaMalpha[3], 
+                       const double gammaMalpha[3], const double rgb[3]){
 
             double xMa[2] = {x0 - a[0], x1 - a[1]};
 
@@ -74,7 +74,7 @@ void triRenderWithAleft(
 
                 for (int x1 = bottom; x1 <= top; x1++)
                     pixSetInterpolate(
-                        x0, x1, a, bMa, cMa, A_I, alpha, 
+                        x0, x1, a, A_I, alpha, 
                         betaMalpha, gammaMalpha, rgb);                     
             }
         }
@@ -86,7 +86,7 @@ void triRenderWithAleft(
 
                 for (int x1 = bottom; x1 <= top; x1++)
                     pixSetInterpolate(
-                        x0, x1, a, bMa, cMa, A_I, alpha, 
+                        x0, x1, a, A_I, alpha, 
                         betaMalpha, gammaMalpha, rgb);            
             }
         }
@@ -102,7 +102,7 @@ void triRenderWithAleft(
 
                 for (int x1 = bottom; x1 <= top; x1++)
                     pixSetInterpolate(
-                        x0, x1, a, bMa, cMa, A_I, alpha, 
+                        x0, x1, a, A_I, alpha, 
                         betaMalpha, gammaMalpha, rgb);                     
             }
         }
@@ -114,7 +114,7 @@ void triRenderWithAleft(
 
                 for (int x1 = bottom; x1 <= top; x1++)
                     pixSetInterpolate(
-                        x0, x1, a, bMa, cMa, A_I, alpha, 
+                        x0, x1, a, A_I, alpha, 
                         betaMalpha, gammaMalpha, rgb);     
             }
         }
