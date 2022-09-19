@@ -29,11 +29,14 @@ void pixSetInterpolate(double x0, double x1, const double a[2], const double A_I
 
             double rgb_int[3]; //vector for interpolated
 
-            double Alpha[2][2]; //matrix to store color vectors
-            mat22Columns(betaMalpha, gammaMalpha, Alpha);
+ 
+
+            double p_ba[3], q_ga[3];
+            vecScale(3, pq[0], betaMalpha, p_ba);
+            vecScale(3, pq[1], gammaMalpha, q_ga);
 
             // interpolation
-            mat221Multiply(Alpha, pq, rgb_int);
+            vecAdd(3, p_ba, q_ga, rgb_int);
             vecAdd(3, rgb_int, alpha, rgb_int);
 
             double rgb_final[3]; //final rgb value
