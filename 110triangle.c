@@ -28,7 +28,7 @@ void pixSetInterpolate(double x0, double x1, const double a[2], const double bMa
             double pq[2]; //vector to hold value of p and q
             mat221Multiply(A_I, xMa, pq);
 
-            double rgb_int[3]; //vector for interpolated and modulated rgb
+            double rgb_int[3]; //vector for interpolated
 
             double Alpha[2][2]; //matrix to store color vectors
             mat22Columns(betaMalpha, gammaMalpha, Alpha);
@@ -37,10 +37,11 @@ void pixSetInterpolate(double x0, double x1, const double a[2], const double bMa
             mat221Multiply(Alpha, pq, rgb_int);
             vecAdd(3, rgb_int, alpha, rgb_int);
 
+            double rgb_final[3]; //final rgb value
             //modulation
-            vecModulate(3, rgb_int, rgb, rgb_int);
+            vecModulate(3, rgb_int, rgb, rgb_final);
             
-            pixSetRGB(x0, x1, rgb_int[0], rgb_int[1], rgb_int[2]);
+            pixSetRGB(x0, x1, rgb_final[0], rgb_final[1], rgb_final[2]);
 
 
         }
