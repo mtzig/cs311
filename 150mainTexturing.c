@@ -15,9 +15,9 @@
 
 
 
-double a[2] = {144.0, -156.0};
-double b[2] = {244.0, 244.0};
-double c[2] = {-226.0, -226.0};
+double a[2] = {288.0, -312.0};
+double b[2] = {288.0, 288.0};
+double c[2] = {-452.0, -452.0};
 double rgb[3] = {1.0, 1.0, 1.0};
 double angle = 0.0;
 
@@ -30,7 +30,7 @@ texTexture *tex;
 
 
 void handleTimeStep(double oldTime, double newTime) {
-    double transl[2] = {256.0, 256.0};
+    double transl[2] = {512.0, 512.0};
     double aa[2], bb[2], cc[2], rrggbb[3], rot[2][2];
     angle += (newTime - oldTime) / 10.0;
     mat22Rotation(angle, rot);
@@ -58,11 +58,11 @@ void handleKeyDown(int key, int shiftIsDown, int controlIsDown,
 
 int main(void) {
 
-    if (pixInitialize(512, 512, "Interpolator") != 0)
+    if (pixInitialize(1024, 1024, "Interpolator") != 0)
         return 1;
 
     tex = (texTexture *)malloc(sizeof(texTexture));
-    texInitializeFile(tex, "pix.png");
+    texInitializeFile(tex, "kanagawa.jpeg");
     texSetFiltering(tex, 0);
     texSetTopBottom(tex, 0);
     texSetLeftRight(tex, 0);
