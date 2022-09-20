@@ -1,5 +1,4 @@
 #include <math.h>
-#include "140texture.c"
 
 
 /*

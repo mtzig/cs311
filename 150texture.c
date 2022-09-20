@@ -1,3 +1,6 @@
+
+
+
 /*** Public: For header file ***/
 
 /* These are constants that are set at compile time. For example, whenever the 
@@ -189,6 +192,34 @@ void texSample(const texTexture *tex, double s, double t, double sample[]) {
     if (tex->filtering == texNEAREST)
         texGetTexel(tex, (int)round(u), (int)round(v), sample);
     else {
-        texGetTexel(tex, (int)round(u), (int)round(v), sample);
+
+        /* f = floor, c = ciel */
+        double ff[tex->texelDim], cf[tex->texelDim], fc[tex->texelDim], cc[tex->texelDim];
+        texGetTexel(tex, (int) floor(u), (int) floor(v), ff);
+        texGetTexel(tex, (int) ceil(u), (int) floor(v), cf);
+        texGetTexel(tex, (int) floor(u), (int) ceil(v), fc);
+        texGetTexel(tex, (int) ceil(u), (int) ceil(v), cc);
+
+        double frac_u = u - floor(u);
+        double frac_v = v - floor(v);
+
+
+        double ff_scale = (1 - frac_u) * (1 - frac_v);
+        double cf_scale = (frac_u) * (1 - frac_v);
+        double fc_scale = (1 - frac_u) * (frac_v);
+        double cc_scale = frac_u * frac_v;
+
+        vecScale(tex->texelDim, ff_scale, ff, ff);
+        vecScale(tex->texelDim, cf_scale, cf, cf);
+        vecScale(tex->texelDim, fc_scale, fc, fc);
+        vecScale(tex->texelDim, cc_scale, cc, cc);
+
+
+        vecAdd(tex->texelDim, ff, cf, sample);
+        vecAdd(tex->texelDim, sample, fc, sample);
+        vecAdd(tex->texelDim, sample, cc, sample);
+
     }
 }
+
+

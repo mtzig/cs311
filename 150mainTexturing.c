@@ -1,16 +1,18 @@
 /* On macOS, compile with...
-    clang 140mainTexturing.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
+    clang 150mainTexturing.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
 
 */
 
 #include <stdio.h>
 #include <math.h>
+#include <GLFW/glfw3.h>
 #include "040pixel.h"
 
 #include "080vector.c"
 #include "100matrix.c"
-#include "140texture.c"
+#include "150texture.c"
 #include "140triangle.c"
+
 
 
 double a[2] = {144.0, -156.0};
@@ -23,6 +25,7 @@ double alpha[2] = {0.0, 0.0};
 double beta[2] = {1.0, 0.0}; 
 double gamma[2] = {0.0, 1.0};
 
+int interpolateMode = 0;
 texTexture *tex;
 
 
@@ -37,9 +40,20 @@ void handleTimeStep(double oldTime, double newTime) {
     vecAdd(2, transl, aa, aa);
     vecAdd(2, transl, bb, bb);
     vecAdd(2, transl, cc, cc);
-    vecScale(3, (2.0 + sin(newTime)) / 3.0, rgb, rrggbb);
     pixClearRGB(0.0, 0.0, 0.0);
-    triRender(aa, bb, cc, rrggbb, tex, alpha, beta, gamma);
+    triRender(aa, bb, cc, rgb, tex, alpha, beta, gamma);
+}
+
+
+void handleKeyDown(int key, int shiftIsDown, int controlIsDown,
+        int altOptionIsDown, int superCommandIsDown) {
+
+    if (key == GLFW_KEY_ENTER){
+        interpolateMode = 1 - interpolateMode;
+        texSetFiltering(tex, interpolateMode);
+    }
+
+        
 }
 
 int main(void) {
@@ -48,12 +62,14 @@ int main(void) {
         return 1;
 
     tex = (texTexture *)malloc(sizeof(texTexture));
-    texInitializeFile(tex, "kanagawa.jpeg");
+    texInitializeFile(tex, "pix.png");
     texSetFiltering(tex, 0);
     texSetTopBottom(tex, 0);
     texSetLeftRight(tex, 0);
 
     pixSetTimeStepHandler(handleTimeStep);
+    pixSetKeyDownHandler(handleKeyDown);
+
 
     pixRun();
     texFinalize(tex);
