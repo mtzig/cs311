@@ -47,8 +47,10 @@ void shadeFragment(
         int unifDim, const double unif[], int texNum, const texTexture *tex[], 
         int attrDim, const double attr[], double rgb[3]) {
 
-        // double rgb_tex[3];
         texSample(tex[0], attr[ATTRS], attr[ATTRT], rgb);
+		vecModulate(3, attr+ATTRR, rgb, rgb); //interpolated rgb is at the pluss ATTR position
+		vecModulate(unifDim, unif, rgb, rgb );
+
 }
 
 /* We have to include triangle.c after defining shadeFragment, because triRender 
