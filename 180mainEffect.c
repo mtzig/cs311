@@ -2,8 +2,7 @@
 
 
 /* On macOS, compile with...
-    clang 170mainAbstracted.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
-
+    clang 180mainEffect.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
 */
 
 #include <stdio.h>
@@ -45,9 +44,11 @@ variables. */
 void shadeFragment(
         int unifDim, const double unif[], int texNum, const texTexture *tex[], 
         int attrDim, const double attr[], double rgb[3]) {
+		
+		double tex_coord[3];
+		texSample(tex[0], attr[ATTRS], attr[ATTRT], tex_coord);
+		texSample(tex[1], tex_coord[1], tex_coord[2], rgb);
 
-        texSample(tex[0], attr[ATTRS], attr[ATTRT], rgb);
-		vecModulate(3, attr+ATTRR, rgb, rgb); //interpolated rgb is at the pluss ATTR position
 		vecModulate(unifDim, unif, rgb, rgb );
 
 }
@@ -62,15 +63,17 @@ shaShading sha;
 const qualifier can be enforced throughout the surrounding code. C is confusing 
 for stuff like this. Don't worry about mastering C at this level. It doesn't 
 come up much in our course. */
-texTexture texture;
-const texTexture *textures[1] = {&texture};
+texTexture texture_kanagawa;
+texTexture texture_monet;
+
+const texTexture *textures[2] = {&texture_kanagawa, &texture_monet};
 const texTexture **tex = textures;
 
 void render(void) {
 	pixClearRGB(0.0, 0.0, 0.0);
-	double a[7] = {400.0, 100.0, 1.0, 1.0, 1.0, 0.0, 0.0};
-	double b[7] = {500.0, 500.0, 0.0, 1.0, 0.0, 1.0, 0.0};
-	double c[7] = {30.0, 30.0, 0.0, 0.0, 0.0, 0.0, 1.0};
+	double a[7] = {400.0, 100.0, 1.0, 1.0};
+	double b[7] = {500.0, 500.0, 0.0, 1.0};
+	double c[7] = {30.0, 30.0, 0.0, 0.0};
 	double unif[3] = {1.0, 1.0, 1.0};
 	triRender(&sha, unif, tex, a, b, c);
 }
@@ -78,10 +81,14 @@ void render(void) {
 void handleKeyUp(int key, int shiftIsDown, int controlIsDown, 
 		int altOptionIsDown, int superCommandIsDown) {
 	if (key == GLFW_KEY_ENTER) {
-		if (texture.filtering == texLINEAR)
-			texSetFiltering(&texture, texNEAREST);
-		else
-			texSetFiltering(&texture, texLINEAR);
+		if (texture_kanagawa.filtering == texLINEAR){
+			texSetFiltering(&texture_kanagawa, texNEAREST);
+			texSetFiltering(&texture_monet, texNEAREST);
+		}
+		else{
+			texSetFiltering(&texture_kanagawa, texLINEAR);
+			texSetFiltering(&texture_monet, texLINEAR);
+		}
 		render();
 	}
 }
@@ -94,21 +101,31 @@ void handleTimeStep(double oldTime, double newTime) {
 int main(void) {
 	if (pixInitialize(512, 512, "Abstracted") != 0)
 		return 1;
-	if (texInitializeFile(&texture, "kanagawa.jpeg") != 0) {
+	if (texInitializeFile(&texture_kanagawa, "kanagawa.jpeg") != 0) {
 	    pixFinalize();
 		return 2;
 	}
-    texSetFiltering(&texture, texNEAREST);
-    texSetLeftRight(&texture, texREPEAT);
-    texSetTopBottom(&texture, texREPEAT);
+
+	if (texInitializeFile(&texture_monet, "monet_lily_pond.jpeg") != 0) {
+	    pixFinalize();
+		return 2;
+	}
+    texSetFiltering(&texture_kanagawa, texNEAREST);
+    texSetLeftRight(&texture_kanagawa, texREPEAT);
+    texSetTopBottom(&texture_kanagawa, texREPEAT);
+
+	texSetFiltering(&texture_monet, texNEAREST);
+    texSetLeftRight(&texture_monet, texREPEAT);
+    texSetTopBottom(&texture_monet, texREPEAT);
     sha.unifDim = 3;
-    sha.attrDim = 2 + 2 + 3;
-    sha.texNum = 1;
+    sha.attrDim = 2 + 2;
+    sha.texNum = 2;
     render();
     pixSetKeyUpHandler(handleKeyUp);
     pixSetTimeStepHandler(handleTimeStep);
     pixRun();
-    texFinalize(&texture);
+    texFinalize(&texture_kanagawa);
+	texFinalize(&texture_monet);
     pixFinalize();
     return 0;
 }
