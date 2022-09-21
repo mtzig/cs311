@@ -1,3 +1,8 @@
+/*
+Thomas Zeng & Shaun Baron-Furuyama
+*/
+
+
 #include <math.h>
 
 

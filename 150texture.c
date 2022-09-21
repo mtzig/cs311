@@ -1,4 +1,6 @@
-
+/*
+Thomas Zeng & Shaun Baron-Furuyama
+*/
 
 
 /*** Public: For header file ***/
