@@ -34,16 +34,6 @@ void interpolate(const int attrDim, const double a[], const double A_I[2][2], co
             vecAdd(attrDim, p_ba, q_ga, attr);
             vecAdd(attrDim, attr, a, attr);
 
-        
-
-
-            // double rgb_tex[3];
-            // texSample(tex, st_coords[0], st_coords[1], rgb_tex);
-            // double rgb_final[3]; //final rgb value
-            // //modulation
-            // vecModulate(3, rgb_tex, rgb, rgb_final);
-            
-
 
 }
 
