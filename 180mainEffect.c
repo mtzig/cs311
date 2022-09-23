@@ -1,7 +1,10 @@
 
 
 
-/* On macOS, compile with...
+/* 
+Thomas Zeng & Shaun Baron-Furuyama
+
+On macOS, compile with...
     clang 180mainEffect.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
 */
 

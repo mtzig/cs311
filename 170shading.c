@@ -1,3 +1,8 @@
+/*
+Thomas Zeng & Shaun Baron-Furuyama
+*/
+
+
 typedef struct shaShading shaShading;
 
 struct shaShading {
