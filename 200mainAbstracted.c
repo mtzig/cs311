@@ -1,6 +1,3 @@
-
-
-
 /* 
 Thomas Zeng & Shaun Baron-Furuyama
 
@@ -137,9 +134,13 @@ int main(void) {
 	    pixFinalize();
 		return 2;
 	}
-
-	if (mesh2DInitializeEllipse(&mesh, 200,0, 200.0, 200.0, 200.0) != 0)
+	if (mesh2DInitializeEllipse(&mesh, 200,0, 200.0, 200.0, 200.0) != 0){
+		pixFinalize();
+		texFinalize(&texture);
 		return 3;
+	}
+
+
 
     texSetFiltering(&texture, texNEAREST);
     texSetLeftRight(&texture, texREPEAT);

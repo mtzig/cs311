@@ -1,6 +1,4 @@
-/*
-Thomas Zeng & Shaun Baron-Furuyama
-*/
+
 
 
 /*** Creating and destroying ***/
@@ -212,9 +210,12 @@ void meshRender(
 	for(int tri = 0; tri < mesh->triNum; tri++){
 		int *verts = meshGetTrianglePointer(mesh, tri);
 
-		double* a = meshGetVertexPointer(mesh, verts[0]);
-		double* b = meshGetVertexPointer(mesh, verts[1]);
-		double* c = meshGetVertexPointer(mesh, verts[2]);
+		double a[sha->varyDim], b[sha->varyDim], c[sha->varyDim];
+
+		/* uses attributes at each viertices to set the varyings*/
+		sha->shadeVertex(sha->unifDim, unif, sha->attrDim, meshGetVertexPointer(mesh, verts[0]), sha->varyDim, a);
+		sha->shadeVertex(sha->unifDim, unif, sha->attrDim, meshGetVertexPointer(mesh, verts[1]), sha->varyDim, b);
+		sha->shadeVertex(sha->unifDim, unif, sha->attrDim, meshGetVertexPointer(mesh, verts[2]), sha->varyDim, c);
 
 		triRender(sha, unif, tex, a, b, c);
 		

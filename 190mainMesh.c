@@ -103,8 +103,11 @@ int main(void) {
 		return 2;
 	}
 
-	if (mesh2DInitializeRectangle(&mesh, 0.0, 500.0, 0.0, 500.0) != 0)
+	if (mesh2DInitializeRectangle(&mesh, 0.0, 500.0, 0.0, 500.0) != 0){
+		pixFinalize();
+		texFinalize(&texture);
 		return 3;
+	}
 
     texSetFiltering(&texture, texNEAREST);
     texSetLeftRight(&texture, texREPEAT);
