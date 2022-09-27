@@ -1,6 +1,5 @@
 
 
-
 /* On macOS, compile with...
     clang 240mainShading.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
 */
@@ -16,8 +15,8 @@
 #include "230matrix.c"
 #include "150texture.c"
 #include "220shading.c"
-/* New! We no longer need to include these files after shadeFragment and 
-shadeVertex. So instead we include them up here. It's good C style to have all 
+/* New! We no longer need to include these files after shadeFragment and
+shadeVertex. So instead we include them up here. It's good C style to have all
 #includes in one section near the top of the file. */
 #include "220triangle.c"
 #include "220mesh.c"
@@ -44,8 +43,9 @@ shadeVertex. So instead we include them up here. It's good C style to have all
 #define TEXB 2
 
 void shadeVertex(
-        int unifDim, const double unif[], int attrDim, const double attr[], 
-        int varyDim, double vary[]) {
+    int unifDim, const double unif[], int attrDim, const double attr[],
+    int varyDim, double vary[])
+{
     double attrHomog[3], varyHomog[3];
 
     attrHomog[2] = 1;
@@ -60,14 +60,15 @@ void shadeVertex(
     vary[VARYT] = attr[ATTRT];
 }
 
+/*This basically does nothing, just multiplies coordinates by 5 */
 void shadeVertex1(
-        int unifDim, const double unif[], int attrDim, const double attr[], 
-        int varyDim, double vary[]) {
+    int unifDim, const double unif[], int attrDim, const double attr[],
+    int varyDim, double vary[])
+{
     double attrHomog[3], varyHomog[3];
 
     attrHomog[2] = 1;
     vecCopy(2, attr, attrHomog);
-
 
     vary[VARYX] = attr[ATTRX] * 5;
     vary[VARYY] = attr[ATTRY] * 5;
@@ -77,21 +78,22 @@ void shadeVertex1(
 }
 
 void shadeFragment(
-        int unifDim, const double unif[], int texNum, const texTexture *tex[], 
-        int varyDim, const double vary[], double rgb[3]) {
+    int unifDim, const double unif[], int texNum, const texTexture *tex[],
+    int varyDim, const double vary[], double rgb[3])
+{
     double sample[tex[0]->texelDim];
     texSample(tex[0], vary[VARYS], vary[VARYT], sample);
     vecModulate(3, sample, &unif[UNIFR], rgb);
 }
 
+/*Basically the same shadeFragment as above but does not modulate the texture */
 void shadeFragment1(
-        int unifDim, const double unif[], int texNum, const texTexture *tex[], 
-        int varyDim, const double vary[], double rgb[3]) {
+    int unifDim, const double unif[], int texNum, const texTexture *tex[],
+    int varyDim, const double vary[], double rgb[3])
+{
     double sample[tex[1]->texelDim];
-    texSample(tex[1], vary[VARYS], vary[VARYT], sample);
-    vecModulate(3, sample, &unif[UNIFR], rgb);
+    texSample(tex[1], vary[VARYS], vary[VARYT], rgb);
 }
-
 
 /* Global variables governing rotation and translation*/
 double rotationAngle = 0.0;
@@ -109,22 +111,24 @@ meshMesh mesh1;
 
 /*first three elements store uniform color,
 rest store homogeonous matrix*/
-double unif[9 + 3] = {1.0, 1.0, 1.0, 
+double unif[9 + 3] = {1.0, 1.0, 1.0,
                       0.0, 0.0, 0.0,
                       0.0, 0.0, 0.0,
                       0.0, 0.0, 0.0};
 
-void render(void) {
+void render(void)
+{
     pixClearRGB(0.0, 0.0, 0.0);
     meshRender(&mesh, &sha, unif, tex);
     meshRender(&mesh1, &sha1, unif, tex);
-
 }
 
 void handleKeyUp(
-        int key, int shiftIsDown, int controlIsDown, int altOptionIsDown, 
-        int superCommandIsDown) {
-    if (key == GLFW_KEY_ENTER) {
+    int key, int shiftIsDown, int controlIsDown, int altOptionIsDown,
+    int superCommandIsDown)
+{
+    if (key == GLFW_KEY_ENTER)
+    {
         if (texture.filtering == texLINEAR)
             texSetFiltering(&texture, texNEAREST);
         else
@@ -133,7 +137,8 @@ void handleKeyUp(
     }
 }
 
-void handleTimeStep(double oldTime, double newTime) {
+void handleTimeStep(double oldTime, double newTime)
+{
     if (floor(newTime) - floor(oldTime) >= 1.0)
         printf("handleTimeStep: %f frames/sec\n", 1.0 / (newTime - oldTime));
     rotationAngle += (newTime - oldTime) * 3.0;
@@ -149,25 +154,30 @@ void handleTimeStep(double oldTime, double newTime) {
     render();
 }
 
-int main(void) {
+int main(void)
+{
     if (pixInitialize(512, 512, "Shader Program") != 0)
         return 1;
-    if (texInitializeFile(&texture, "kanagawa.jpeg") != 0) {
+    if (texInitializeFile(&texture, "kanagawa.jpeg") != 0)
+    {
         pixFinalize();
         return 2;
     }
-    if (texInitializeFile(&texture1, "monet_lily_pond.jpeg") != 0) {
+    if (texInitializeFile(&texture1, "monet_lily_pond.jpeg") != 0)
+    {
         texFinalize(&texture);
         pixFinalize();
         return 3;
     }
-    if (mesh2DInitializeEllipse(&mesh, 0.0, 0.0, 256.0, 128.0, 40) != 0) {
+    if (mesh2DInitializeEllipse(&mesh, 0.0, 0.0, 256.0, 128.0, 40) != 0)
+    {
         texFinalize(&texture1);
         texFinalize(&texture);
         pixFinalize();
         return 4;
     }
-    if (mesh2DInitializeEllipse(&mesh1, 50.0, 50.0, 50.0 , 128.0, 40) != 0) {
+    if (mesh2DInitializeEllipse(&mesh1, 50.0, 50.0, 50.0, 10.0, 40.0) != 0)
+    {
         meshFinalize(&mesh);
         texFinalize(&texture1);
         texFinalize(&texture);
@@ -192,7 +202,6 @@ int main(void) {
     sha1.shadeVertex = shadeVertex1;
     sha1.shadeFragment = shadeFragment1;
 
-
     render();
     pixSetKeyUpHandler(handleKeyUp);
     pixSetTimeStepHandler(handleTimeStep);
@@ -205,5 +214,3 @@ int main(void) {
     pixFinalize();
     return 0;
 }
-
-
