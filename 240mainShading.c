@@ -188,14 +188,14 @@ int main(void)
     texSetLeftRight(&texture, texREPEAT);
     texSetTopBottom(&texture, texREPEAT);
     /* New! The shader program now records which shader functions to use. */
-    sha.unifDim = 3 + 3;
+    sha.unifDim = 3 + 9;
     sha.attrDim = 2 + 2;
     sha.varyDim = 2 + 2;
     sha.texNum = 2;
     sha.shadeVertex = shadeVertex;
     sha.shadeFragment = shadeFragment;
 
-    sha1.unifDim = 3 + 3;
+    sha1.unifDim = 3 + 9;
     sha1.attrDim = 2 + 2;
     sha1.varyDim = 2 + 2;
     sha1.texNum = 2;

@@ -142,7 +142,7 @@ int main(void)
     texSetLeftRight(&texture, texREPEAT);
     texSetTopBottom(&texture, texREPEAT);
     /* New! The shader program now records which shader functions to use. */
-    sha.unifDim = 3 + 3;
+    sha.unifDim = 3 + 9;
     sha.attrDim = 2 + 2;
     sha.varyDim = 2 + 2;
     sha.texNum = 1;
