@@ -4,9 +4,7 @@ Thomas Zeng & Shaun Baron-Furuyama
 
 
 /* On macOS, compile with...
-    clang 250main3D.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
-On Ubuntu, compile with...
-    cc 250main3D.c 040pixel.o -lglfw -lGL -lm -ldl
+    clang 260mainDepth.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
 */
 
 #include <stdio.h>
@@ -18,10 +16,11 @@ On Ubuntu, compile with...
 
 #include "250vector.c"
 #include "250matrix.c"
+#include "260depth.c"
 #include "150texture.c"
-#include "220shading.c"
-#include "250triangle.c"
-#include "220mesh.c"
+#include "260shading.c"
+#include "260triangle.c"
+#include "260mesh.c"
 #include "190mesh2D.c"
 #include "250mesh3D.c"
 
@@ -35,8 +34,9 @@ On Ubuntu, compile with...
 #define ATTRP 7
 #define VARYX 0
 #define VARYY 1
-#define VARYS 2
-#define VARYT 3
+#define VARYZ 2
+#define VARYS 3
+#define VARYT 4
 #define UNIFR 0
 #define UNIFG 1
 #define UNIFB 2
@@ -50,26 +50,31 @@ void shadeVertex(
         int varyDim, double vary[]) {
 	double attrHomog[4] = {attr[0], attr[1], attr[2], 1.0};
 	mat441Multiply((double(*)[4])(&unif[UNIFMODELING]), attrHomog, vary);
+	//varyz should be automatic
 	vary[VARYS] = attr[ATTRS];
 	vary[VARYT] = attr[ATTRT];
 }
 
 void shadeFragment(
         int unifDim, const double unif[], int texNum, const texTexture *tex[], 
-        int varyDim, const double vary[], double rgb[3]) {
+        int varyDim, const double vary[], double rgbd[4]) {
 	double sample[tex[0]->texelDim];
 	texSample(tex[0], vary[VARYS], vary[VARYT], sample);
 	//vecModulate(3, sample, &unif[UNIFR], rgb);
-	rgb[0] = sample[TEXR] * unif[UNIFR];
-	rgb[1] = sample[TEXG] * unif[UNIFG];
-	rgb[2] = sample[TEXB] * unif[UNIFB];
+	rgbd[0] = sample[TEXR] * unif[UNIFR];
+	rgbd[1] = sample[TEXG] * unif[UNIFG];
+	rgbd[2] = sample[TEXB] * unif[UNIFB];
+	rgbd[3] = -vary[VARYZ];
+
 }
 
 shaShading sha;
 texTexture texture;
 const texTexture *textures[1] = {&texture};
 const texTexture **tex = textures;
-meshMesh mesh;
+meshMesh mesh, mesh1;
+depthBuffer buf;
+
 double unif[3 + 16] = {
     1.0, 1.0, 1.0, 
 	1.0, 0.0, 0.0, 0.0, 
@@ -81,7 +86,10 @@ double translationVector[2] = {256.0, 256.0};
 
 void render(void) {
 	pixClearRGB(0.0, 0.0, 0.0);
-	meshRender(&mesh, &sha, unif, tex);
+	depthClearDepths(&buf, 1000.0);
+	meshRender(&mesh, &buf, &sha, unif, tex);
+	meshRender(&mesh1, &buf, &sha, unif, tex);
+
 }
 
 void handleKeyUp(
@@ -123,12 +131,26 @@ int main(void) {
 	    pixFinalize();
 		return 3;
 	}
+	if (depthInitialize(&buf, 512, 512) != 0){
+		meshFinalize(&mesh);
+		texFinalize(&texture);
+	    pixFinalize();
+		return 4;
+	}
+	// if (mesh3DInitializeCapsule(&mesh1, 100.0, 50.0, 50, 50) != 0){
+	if (mesh3DInitializeSphere(&mesh1, 50.0, 50, 50) != 0) {
+		depthFinalize(&buf);
+		meshFinalize(&mesh);
+		texFinalize(&texture);
+	    pixFinalize();
+		return 5;
+	}
     texSetFiltering(&texture, texNEAREST);
     texSetLeftRight(&texture, texREPEAT);
     texSetTopBottom(&texture, texREPEAT);
     sha.unifDim = 3 + 16;
     sha.attrDim = 3 + 2 + 3;
-    sha.varyDim = 2 + 2;
+    sha.varyDim = 3 + 2;
     sha.shadeVertex = shadeVertex;
     sha.shadeFragment = shadeFragment;
     sha.texNum = 1;
@@ -136,7 +158,9 @@ int main(void) {
     pixSetKeyUpHandler(handleKeyUp);
     pixSetTimeStepHandler(handleTimeStep);
     pixRun();
+	depthFinalize(&buf);
     meshFinalize(&mesh);
+    meshFinalize(&mesh1);
     texFinalize(&texture);
     pixFinalize();
     return 0;

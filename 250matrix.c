@@ -1,4 +1,6 @@
-
+/*
+Thomas Zeng & Shaun Baron-Furuyama
+*/
 /*** 2 x 2 Matrices ***/
 
 /* Pretty-prints the given matrix, with one line of text per row of matrix. */

@@ -1,3 +1,6 @@
+/*
+Thomas Zeng & Shaun Baron-Furuyama
+*/
 
 /*** In general dimensions ***/
 
