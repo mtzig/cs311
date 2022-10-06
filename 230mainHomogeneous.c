@@ -33,7 +33,7 @@ shadeVertex. So instead we include them up here. It's good C style to have all
 #define UNIFR 0
 #define UNIFG 1
 #define UNIFB 2
-#define UNIFMODELING 4
+#define UNIFMODELING 3
 
 // #define UNIFTRANSL0 3
 // #define UNIFTRANSL1 4
@@ -117,6 +117,7 @@ void handleTimeStep(double oldTime, double newTime)
     double isom[3][3];
     mat33Isometry(rotationAngle, translationVector, isom);
     vecCopy(9, (double *)isom, &unif[UNIFMODELING]);
+    mat22Print(isom);
 
     unif[UNIFR] = sin(newTime);
     unif[UNIFG] = cos(oldTime);

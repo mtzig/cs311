@@ -77,6 +77,7 @@ void triRenderWithAleft(
                 for (int x1 = MAX(bottom, 0); x1 <= top && x1 <= buf->width; x1++)
                 {
                     interpolate(varyDim, a, A_I, bMa, cMa, x0, x1, vary);
+
                     sha->shadeFragment(sha->unifDim, unif, sha->texNum, tex, varyDim, vary, rgbd);
                     if (rgbd[3] < depthGetDepth(buf, x0, x1)) //only render if depth is smaller
                     {
