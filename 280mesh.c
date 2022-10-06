@@ -241,7 +241,6 @@ void meshRender(
 		mat441Multiply(viewport, b, bHomog);
 		mat441Multiply(viewport, c, cHomog);
 
-		// printf("x%f y%f z%f w%f",aHomog[0], aHomog[1], aHomog[2], aHomog[3]);
 
 
 		for(int i = 0; i<4; i++){
@@ -250,8 +249,6 @@ void meshRender(
 			c[i] = cHomog[i] / cHomog[3];
 
 		}
-
-		// printf("x%f y%f z%f",a[0], a[1], a[2]);
 
 		triRender(sha, buf, unif, tex, a, b, c);
 	}

@@ -124,7 +124,7 @@ double unif[16 + 16 + 16] = {
 
 double rotationAngle = 0;//M_PI /2;
 double translationVectorRectangle[3] = {0.0, 0.0, 0.0};
-double translationVectorSphere[3] = {0.5, 1, -10};
+double translationVectorSphere[3] = {0.5, 0.5, -8};
 // double projection[6] = {0.0, 5.0, 0.0, 5.0, -2.0, 0.0};
 
 
@@ -187,7 +187,7 @@ int main(void)
 		return 2;
 	}
 	// if (mesh3DInitializeCylinder(&mesh, 0.5, 4.0, 20) != 0)
-	if(mesh3DInitializeBox(&mesh, 1.28 , 2.5, 0.64, 3.0, -10, -12) != 0)
+	if(mesh3DInitializeBox(&mesh, -1 , 1, 0.64, 2.0, -12, -10) != 0)
 	{
 		texFinalize(&texture);
 		pixFinalize();
