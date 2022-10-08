@@ -75,10 +75,11 @@ void isoGetInverseHomogeneous(const isoIsometry *iso, double homogInv[4][4]) {
 
 	// "inverse" of translation
 	mat331Multiply(rotateInverse, iso->translation, translateInverse);
-	for(int i=0 ; i<2; i++)
-		translateInverse[i] = -translateInverse[i];
+	vecScale(3, -1.0, translateInverse, translateInverse);
 
 	mat44Isometry(rotateInverse, translateInverse, homogInv);
+
+	
 
 }
 

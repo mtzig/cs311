@@ -243,22 +243,16 @@ void meshRender(
 		mat441Multiply(viewport, b, bHomog);
 		mat441Multiply(viewport, c, cHomog);
 
+	
+	vecCopy(4, aHomog, a);
+	vecCopy(4, bHomog, b);
+	vecCopy(4, cHomog, c);
 
 
-	for(int i = 0; i<4; i++){
-			a[i] = aHomog[i] / aHomog[3];
-			b[i] = bHomog[i] / bHomog[3];
-			c[i] = cHomog[i] / cHomog[3];
+	vecScale(sha->varyDim, 1/a[3], a, a);
+	vecScale(sha->varyDim, 1/b[3], b, b);
+	vecScale(sha->varyDim, 1/c[3], c, c);
 
-		}
-
-	for(int i=4; i<sha->varyDim; i++){
-			a[i] /= aHomog[3];
-			b[i] /= bHomog[3];
-			c[i] /= cHomog[3];
-
-	}
-
-		triRender(sha, buf, unif, tex, a, b, c);
+	triRender(sha, buf, unif, tex, a, b, c);
 	}
 }

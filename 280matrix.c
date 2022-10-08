@@ -182,7 +182,7 @@ void mat33BasisRotation(
     vec3Cross(u, v, uCrossv);
     vec3Cross(a, b, aCrossb);
 
-    double S[3][3], R[3][3], RT[3][3];
+    double S[3][3], RT[3][3];
 
     for (int i = 0; i < 3; i++)
     {
@@ -190,13 +190,11 @@ void mat33BasisRotation(
         S[i][1] = b[i];
         S[i][2] = aCrossb[i];
 
-        R[i][0] = u[i];
-        R[i][1] = v[i];
-        R[i][2] = uCrossv[i];
+        RT[0][i] = u[i];
+        RT[1][i] = v[i];
+        RT[2][i] = uCrossv[i];
     }
-
-    mat33Transpose(R, RT);
-
+ 
     mat333Multiply(S, RT, rot);
 }
 
