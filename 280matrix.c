@@ -128,7 +128,7 @@ void mat33AngleAxisRotation(
     U[0][1] = -axis[2];
     U[0][2] = axis[1];
 
-    U[1][0] = axis[0];
+    U[1][0] = axis[2];
     U[1][1] = 0;
     U[1][2] = -axis[0];
 
