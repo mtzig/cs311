@@ -142,7 +142,7 @@ int main(void) {
 	/* Configure texture. */
     texSetFiltering(&texture, texNEAREST);
     texSetLeftRight(&texture, texREPEAT);
-    texSetTopBottom(&texture, texREPEAT);
+    texSetTopBottom(&texture, texCLIP);
     /* Configure shader program. */
     sha.unifDim = 16 + 16;
     sha.attrDim = 3 + 2 + 3;
