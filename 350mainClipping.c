@@ -3,8 +3,10 @@ Thomas Zeng & Shaun Baron-Furuyama
 */
 
 
+
 /* On macOS, compile with...
-wwOn Ubuntu, compile with...
+    clang 350mainClipping.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
+On Ubuntu, compile with...
     cc 340mainLandscape.c 040pixel.o -lglfw -lGL -lm -ldl
 */
 
@@ -22,7 +24,7 @@ wwOn Ubuntu, compile with...
 #include "260shading.c"
 #include "260depth.c"
 #include "270triangle.c"
-#include "330mesh.c"
+#include "350mesh.c"
 #include "190mesh2D.c"
 #include "250mesh3D.c"
 #include "300isometry.c"
@@ -72,7 +74,6 @@ void shadeFragment(
         int unifDim, const double unif[], int texNum, const texTexture *tex[], 
         int varyDim, const double vary[], double rgbd[4]) {
 	
-
 	double vary_scale[varyDim];
 	vecCopy(varyDim, vary, vary_scale);
 	vecScale(6, 1/vary[VARY1], &vary_scale[VARYS], &vary_scale[VARYS]); //only scale stuff not xyzw
