@@ -214,7 +214,7 @@ void handleKeyUp(
 	else if (key == GLFW_KEY_O)
 	{
 		rho += 0.1;
-		camSetFrustum(&cam, M_PI / 6.0, 10.0, 10.0, 512, 512);
+		camSetFrustum(&cam, M_PI / 6.0, rho, 10.0, 512, 512);
 		camLookAt(&cam, target, rho, phi, theta);
 		double proj[4][4];
 		camGetProjectionInverseIsometry(&cam, proj);
@@ -223,7 +223,7 @@ void handleKeyUp(
 	else if (key == GLFW_KEY_L)
 	{
 		rho -= 0.1;
-		camSetFrustum(&cam, M_PI / 6.0, 10.0, 10.0, 512, 512);
+		camSetFrustum(&cam, M_PI / 6.0, rho, 10.0, 512, 512);
 		camLookAt(&cam, target, rho, phi, theta);
 		double proj[4][4];
 		camGetProjectionInverseIsometry(&cam, proj);
