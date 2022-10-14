@@ -74,7 +74,7 @@ void triRenderWithAleft(
                 int bottom = (int)ceil(pointSlope(x0, a, b));
                 int top = (int)floor(pointSlope(x0, a, c));
 
-                for (int x1 = MAX(bottom, 0); x1 <= top && x1 <= buf->width; x1++)
+                for (int x1 = MAX(bottom, 0); x1 <= top && x1 <= buf->height; x1++)
                 {
                     interpolate(varyDim, a, A_I, bMa, cMa, x0, x1, vary);
 
@@ -95,7 +95,7 @@ void triRenderWithAleft(
                 int bottom = (int)ceil(pointSlope(x0, a, b));
                 int top = (int)floor(pointSlope(x0, c, b));
 
-                for (int x1 =MAX(bottom, 0); x1 <= top && x1 <= buf->width; x1++)
+                for (int x1 =MAX(bottom, 0); x1 <= top && x1 <= buf->height; x1++)
                 {
                     interpolate(varyDim, a, A_I, bMa, cMa, x0, x1, vary);
                     sha->shadeFragment(sha->unifDim, unif, sha->texNum, tex, varyDim, vary, rgbd);
@@ -117,7 +117,7 @@ void triRenderWithAleft(
                 int bottom = (int)ceil(pointSlope(x0, a, b));
                 int top = (int)floor(pointSlope(x0, a, c));
 
-                for (int x1 = MAX(bottom, 0); x1 <= top && x1 <= buf->width; x1++)
+                for (int x1 = MAX(bottom, 0); x1 <= top && x1 <= buf->height; x1++)
                 {
                     interpolate(varyDim, a, A_I, bMa, cMa, x0, x1, vary);
                     sha->shadeFragment(sha->unifDim, unif, sha->texNum, tex, varyDim, vary, rgbd);
@@ -137,7 +137,7 @@ void triRenderWithAleft(
             int bottom = (int)ceil(pointSlope(x0, c, b));
             int top = (int)floor(pointSlope(x0, a, c));
 
-            for (int x1 = MAX(bottom, 0); x1 <= top && x1 <= buf->width; x1++)
+            for (int x1 = MAX(bottom, 0); x1 <= top && x1 <= buf->height; x1++)
             {
                 interpolate(varyDim, a, A_I, bMa, cMa, x0, x1, vary);
                 sha->shadeFragment(sha->unifDim, unif, sha->texNum, tex, varyDim, vary, rgbd);
