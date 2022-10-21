@@ -1,4 +1,7 @@
+/*
+Thomas Zeng & Kyosuke
 
+*/
 
 /* 'Vesh' means 'Vulkan mesh'. As soon as it's created, we load it into GPU
 memory, for fast rendering. */
