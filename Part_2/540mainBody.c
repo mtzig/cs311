@@ -1,37 +1,25 @@
 
-/* Thomas Zeng & Kyosuke */
+/*
+Thomas Zeng & Kyosuke
+*/
 
 /*
 
-This file is the fifth step in my Vulkan tutorials, which are based on the 2020 
-April version of Alexander Overvoorde's Vulkan tutorial at 
-    https://www.vulkan-tutorial.com/
-in consultation with the Vulkan Programming Guide by Graham Sellers and other 
-sources. In this step, we introduce uniforms, such as a 4x4 modeling matrix,  
-that have body-specific values. Because there may be many bodies, we need to 
-maintain arrays of these uniforms. An annoying wrinkle is that the GPU has rules 
-about how these arrays are aligned in memory. Anyway, the resulting program 
-rotates one of the meshes, but not the other, while the camera revolves around 
-both of them. Code that is new, compared to the preceding tutorial, is marked 
-'New' in the comments.
-
-(By the way, a Vulkan feature called 'push constants' might appear ideal for 
-this purpose, but changing push constant values requires rebuilding the command 
-buffers, which I don't want to do on each animation frame.)
+Code that is new, compared to the final Vulkan tutorial, is marked 'New'.
 
 On macOS, make sure that NUMDEVICEEXT below is 2, and then compile with 
-    clang 510mainUniforms.c -lglfw -lvulkan
+    clang 540mainBody.c -lglfw -lvulkan
 You might also need to compile the shaders with 
-    glslc 500shader.vert -o 500vert.spv
-    glslc 480shader.frag -o 480frag.spv
+    glslc 530shader.vert -o 530vert.spv
+    glslc 530shader.frag -o 530frag.spv
 Then run the program with 
     ./a.out
 
 On Linux, make sure that NUMDEVICEEXT below is 1, and then compile with 
-    clang 500mainUniforms.c -lglfw -lvulkan -lm
+    clang 530mainBaseline.c -lglfw -lvulkan -lm
 You might also need to compile the shaders with 
-    /mnt/c/VulkanSDK/1.3.216.0/Bin/glslc.exe 500shader.vert -o 500vert.spv
-    /mnt/c/VulkanSDK/1.3.216.0/Bin/glslc.exe 480shader.frag -o 480frag.spv
+    /mnt/c/VulkanSDK/1.3.216.0/Bin/glslc.exe 530shader.vert -o 530vert.spv
+    /mnt/c/VulkanSDK/1.3.216.0/Bin/glslc.exe 530shader.frag -o 530frag.spv
 (You might have to change the SDK version number to match your installation.) 
 Then run the program with 
     ./a.out
@@ -48,6 +36,8 @@ If you see errors, then try changing ANISOTROPY to 0 and/or MAXFRAMESINFLIGHT to
 #include <GLFW/glfw3.h>
 #include <sys/time.h>
 #include <math.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 
 
@@ -88,8 +78,8 @@ const char* deviceExtensions[MAXDEVICEEXT] = {
 
 /*** INFRASTRUCTURE ***********************************************************/
 
-/* Remember (from the previous tutorials) to read from globals as you like but 
-write to globals only through their accessor functions. */
+/* Remember to read from globals as you like but write to globals only through 
+their accessor functions. */
 #include "440gui.c"
 guiGUI gui;
 #include "440vulkan.c"
@@ -102,133 +92,292 @@ swapChain swap;
 #include "460mesh.c"
 #include "480uniform.c"
 #include "480description.c"
+#include "520texture.c"
 #include "470vector.c"
 #include "490matrix.c"
 #include "490isometry.c"
+#include "490camera.c"
+#include "470mesh.c"
+#include "470mesh2D.c"
+#include "470mesh3D.c"
+#include "470vesh.c"
 
+/* New. */
+#include "530landscape.c"
+
+typedef struct BodyUniforms BodyUniforms;
+struct BodyUniforms {
+    float modelingT[4][4];
+    uint32_t texIndices[4];
+};
+
+#include "540body.c"
 
 
 
 /*** ARTWORK ******************************************************************/
 
+/* New: Three veshes using the attribute style XYZ, ST, NOP. */
+veshStyle style;
+veshVesh landVesh, waterVesh, heroVesh;
+
+/* New: Elevation data and functions to set them. Keep in mind that each of our 
+veshes is limited to 65,536 triangles. And the landscape and water will each use 
+2 LANDSIZE^2 triangles. So don't set LANDSIZE to be more than about 180. */
+#define LANDSIZE 100
+float landData[LANDSIZE * LANDSIZE];
+float waterData[LANDSIZE * LANDSIZE];
+
+void setLand() {
+    landFlat(LANDSIZE, landData, 0.0);
+    time_t t;
+	srand((unsigned)time(&t));
+    for (int i = 0; i < 32; i += 1)
+		landFaultRandomly(LANDSIZE, landData, 1.5 - i * 0.04);
+	for (int i = 0; i < 4; i += 1)
+		landBlur(LANDSIZE, landData);
+	for (int i = 0; i < 16; i += 1)
+		landBump(
+		    LANDSIZE, landData, landInt(0, LANDSIZE - 1), 
+		    landInt(0, LANDSIZE - 1), 5.0, 2.0);
+}
+
+void setWater() {
+    float landMin, landMean, landMax;
+    landStatistics(LANDSIZE, landData, &landMin, &landMean, &landMax);
+    landFlat(LANDSIZE, waterData, landMean);
+    for (int i = 0; i < LANDSIZE; i += 1)
+        for (int j = 0; j < LANDSIZE; j += 1)
+            waterData[i * LANDSIZE + j] += 0.1 * sin(i * M_PI / 5.0);
+}
+
+/* New: Our artwork initialization is big enough, that we break it up. */
+int initializeVeshes() {
+    meshMesh mesh;
+    /* Randomly generate the landscape. */
+    setLand();
+    setWater();
+    /* Make the hero vesh. */
+    if (mesh3DInitializeCapsule(&mesh, 0.5, 2.0, 16, 32) != 0) {
+        return 6;
+    }
+    if (veshInitializeMesh(&heroVesh, &mesh) != 0) {
+        meshFinalize(&mesh);
+        return 5;
+    }
+    meshFinalize(&mesh);
+    /* Make the land vesh. */
+    if (mesh3DInitializeLandscape(&mesh, LANDSIZE, 1.0, landData) != 0) {
+        veshFinalize(&heroVesh);
+        return 4;
+    }
+    if (veshInitializeMesh(&landVesh, &mesh) != 0) {
+        meshFinalize(&mesh);
+        veshFinalize(&heroVesh);
+        return 3;
+    }
+    meshFinalize(&mesh);
+    /* Make the water vesh. */
+    if (mesh3DInitializeLandscape(&mesh, LANDSIZE, 1.0, waterData) != 0) {
+        veshFinalize(&landVesh);
+        veshFinalize(&heroVesh);
+        return 2;
+    }
+    if (veshInitializeMesh(&waterVesh, &mesh) != 0) {
+        meshFinalize(&mesh);
+        veshFinalize(&landVesh);
+        veshFinalize(&heroVesh);
+        return 1;
+    }
+    meshFinalize(&mesh);
+    return 0;
+}
+
+/* New. */
+void finalizeVeshes() {
+    veshFinalize(&waterVesh);
+    veshFinalize(&landVesh);
+    veshFinalize(&heroVesh);
+}
+
+/* Textures. */
+#define TEXNUM 3
+VkSampler texSampRepeat, texSampClamp;
+VkSampler texSamps[TEXNUM];
+VkImage texIms[TEXNUM];
+VkDeviceMemory texImMems[TEXNUM];
+VkImageView texImViews[TEXNUM];
+
+/* New. */
+int initializeTextures() {
+    /* Initialize two samplers. */
+    if (texInitializeSampler(
+            &texSampRepeat, VK_SAMPLER_ADDRESS_MODE_REPEAT, 
+            VK_SAMPLER_ADDRESS_MODE_REPEAT) != 0) {
+        return 5;
+    }
+    if (texInitializeSampler(
+            &texSampClamp, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 
+            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE) != 0) {
+        texFinalizeSampler(&texSampRepeat);
+        return 4;
+    }
+    /* The first sampler acts on the first two textures. The second sampler acts 
+    on the third texture. */
+    texSamps[0] = texSampRepeat;
+    texSamps[1] = texSampRepeat;
+    texSamps[2] = texSampClamp;
+    /* Initialize three textures. */
+    if (texInitializeFile(
+            &texIms[0], &texImMems[0], &texImViews[0], "grayish.png") != 0) {
+        texFinalizeSampler(&texSampClamp);
+        texFinalizeSampler(&texSampRepeat);
+        return 3;
+    }
+    if (texInitializeFile(
+            &texIms[1], &texImMems[1], &texImViews[1], "bluish.png") != 0) {
+        texFinalize(&texIms[0], &texImMems[0], &texImViews[0]);
+        texFinalizeSampler(&texSampClamp);
+        texFinalizeSampler(&texSampRepeat);
+        return 2;
+    }
+    if (texInitializeFile(
+            &texIms[2], &texImMems[2], &texImViews[2], "reddish.png") != 0) {
+        texFinalize(&texIms[1], &texImMems[1], &texImViews[1]);
+        texFinalize(&texIms[0], &texImMems[0], &texImViews[0]);
+        texFinalizeSampler(&texSampClamp);
+        texFinalizeSampler(&texSampRepeat);
+        return 1;
+    }
+    return 0;
+}
+
+/* New. */
+void finalizeTextures() {
+    texFinalize(&texIms[2], &texImMems[2], &texImViews[2]);
+    texFinalize(&texIms[1], &texImMems[1], &texImViews[1]);
+    texFinalize(&texIms[0], &texImMems[0], &texImViews[0]);
+    texFinalizeSampler(&texSampClamp);
+    texFinalizeSampler(&texSampRepeat);
+}
+
+/* New: Camera and hero data. */
+camCamera camera;
+float cameraRho = 10.0, cameraPhi = M_PI / 4.0, cameraTheta = M_PI / 4.0;
+float heroPos[3] = {0.5 * LANDSIZE, 0.5 * LANDSIZE, 0.0};
+float heroHeading = 0.0;
+int heroWDown = 0, heroSDown = 0, heroADown = 0, heroDDown = 0;
+
+/* New: Called by setBodyUniforms. */
+void setHero() {
+    float changeInTime = gui.currentTime - gui.lastTime;
+    if (heroADown)
+        heroHeading += M_PI * changeInTime;
+    if (heroDDown)
+        heroHeading -= M_PI * changeInTime;
+    if (heroWDown) {
+        heroPos[0] += 2.0 * changeInTime * cos(heroHeading);
+        heroPos[1] += 2.0 * changeInTime * sin(heroHeading);
+    }
+    if (heroSDown) {
+        heroPos[0] -= 2.0 * changeInTime * cos(heroHeading);
+        heroPos[1] -= 2.0 * changeInTime * sin(heroHeading);
+    }
+    if (0.0 <= heroPos[0] && heroPos[0] <= LANDSIZE - 1.0 && 
+            0.0 <= heroPos[1] && heroPos[1] <= LANDSIZE - 1.0) {
+        /* Where have we seen this kind of calculation before now? */
+        int flX = (int)floor(heroPos[0]);
+        int ceX = (int)ceil(heroPos[0]);
+        int flY = (int)floor(heroPos[1]);
+        int ceY = (int)ceil(heroPos[1]);
+        float frX = heroPos[0] - flX;
+        float frY = heroPos[1] - flY;
+        heroPos[2] = (1 - frX) * (1 - frY) * landData[flX * LANDSIZE + flY]
+            + (1 - frX) * (frY) * landData[flX * LANDSIZE + ceY]
+            + (frX) * (1 - frY) * landData[ceX * LANDSIZE + flY]
+            + (frX) * (frY) * landData[ceX * LANDSIZE + ceY];
+        heroPos[2] += 1.0;
+    }
+}
+
+/* New: Called by setSceneUniforms. */
+void setCamera() {
+    camSetFrustum(
+        &camera, M_PI / 6.0, cameraRho, 10.0, swap.extent.width, 
+        swap.extent.height);
+    camLookAt(&camera, heroPos, cameraRho, cameraPhi, cameraTheta);
+}
+
+/* New: We start to build a scene with three bodies. */
+int bodyNum = 3;
+
+bodyBody bodyH, bodyL, bodyW;
+/* New. Not much here yet. The camera and the hero are part of the scene, but 
+they get updated on each time step automatically. */
+int initializeScene() {
+
+
+
+    bodyConfigure(&bodyL, &landVesh);
+    bodyConfigure(&bodyW, &waterVesh);
+    bodyConfigure(&bodyH, &heroVesh);
+
+    bodyL.uniforms.texIndices[0] = 0;
+    bodyW.uniforms.texIndices[0] = 1;
+    bodyH.uniforms.texIndices[0] = 2;
+
+    camSetProjectionType(&camera, camPERSPECTIVE);
+    return 0;
+}
+
+/* New. */
+void finalizeScene() {
+    return;
+}
+
 /* Here's the variable to hold the shader program. */
 shaProgram shaProg;
-
-/* Our meshes are assumed to use a single attribute style: three attributes of 
-dimensions 3 (xyz), 3 (rgb), 2 (st). */
-#define MESHNUMATTRS 3
-int meshAttrDims[MESHNUMATTRS] = {3, 3, 2};
-/* Several variables are needed to pass that mesh style to Vulkan. */
-int meshTotalAttrDim;
-VkPipelineVertexInputStateCreateInfo vertexInputInfo;
-VkPipelineInputAssemblyStateCreateInfo inputAssembly;
-VkVertexInputBindingDescription meshBindingDesc;
-VkVertexInputAttributeDescription meshAttrDescs[MESHNUMATTRS];
-
-/* Here is a specific mesh with eight vertices and four triangles. */
-int meshNumVertsA = 8;
-const float meshVertsA[] = {
-    -0.5, -0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 
-    0.5, -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 
-    0.5, 0.5, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 
-    -0.5, 0.5, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 
-    -0.5, -0.5, 0.5, 1.0, 0.0, 0.0, 0.0, 0.0, 
-    0.5, -0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 0.0, 
-    0.5, 0.5, 0.5, 0.0, 0.0, 1.0, 1.0, 1.0, 
-    -0.5, 0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 1.0
-};
-int meshNumTrisA = 4;
-const uint16_t meshTrisA[] = {
-    0, 1, 2, 
-    2, 3, 0, 
-    4, 5, 6, 
-    6, 7, 4, 
-};
-VkBuffer meshVertBufA;
-VkDeviceMemory meshVertBufMemA;
-VkBuffer meshTriBufA;
-VkDeviceMemory meshTriBufMemA;
-
-/* Here is another specific mesh with four vertices and four triangles. */
-int meshNumVertsB = 4;
-const float meshVertsB[] = {
-    1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 
-    2.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 
-    1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 
-    1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0
-};
-int meshNumTrisB = 4;
-const uint16_t meshTrisB[] = {
-    0, 2, 1, 
-    0, 1, 3, 
-    0, 3, 2, 
-    3, 1, 2, 
-};
-VkBuffer meshVertBufB;
-VkDeviceMemory meshVertBufMemB;
-VkBuffer meshTriBufB;
-VkDeviceMemory meshTriBufMemB;
-
-isoIsometry isoA, isoB;
 
 /* Initializes the artwork. Upon success (return code 0), don't forget to 
 finalizeArtwork later. */
 int initializeArtwork() {
-
-    float rot[3][3] = {
-        {1.0, 0.0, 0.0},
-        {0.0, 1.0, 0.0},
-        {0.0, 0.0, 1.0}}; 
-
-    isoSetRotation(&isoA, rot);
-    isoSetRotation(&isoB, rot);
-
-
-
-    /* New: Load the updated vertex shader. */
-    if (shaInitialize(&shaProg, "500vert.spv", "480frag.spv") != 0) {
-        return 7;
-    }
-    meshGetStyle(
-        MESHNUMATTRS, meshAttrDims, &meshTotalAttrDim, &meshBindingDesc, 
-        meshAttrDescs, &vertexInputInfo, &inputAssembly);
-    if (meshInitializeVertexBuffer(
-            &meshVertBufA, &meshVertBufMemA, meshTotalAttrDim, meshNumVertsA, 
-            meshVertsA) != 0) {
-        shaFinalize(&shaProg);
-        return 6;
-    }
-    if (meshInitializeIndexBuffer(
-            &meshTriBufA, &meshTriBufMemA, meshNumTrisA, meshTrisA) != 0) {
-        meshFinalizeVertexBuffer(&meshVertBufA, &meshVertBufMemA);
-        shaFinalize(&shaProg);
+    /* New: New shaders and new helper functions. */
+    if (shaInitialize(&shaProg, "530vert.spv", "530frag.spv") != 0) {
         return 5;
     }
-    if (meshInitializeVertexBuffer(
-            &meshVertBufB, &meshVertBufMemB, meshTotalAttrDim, meshNumVertsB, 
-            meshVertsB) != 0) {
-        meshFinalizeIndexBuffer(&meshTriBufA, &meshTriBufMemA);
-        meshFinalizeVertexBuffer(&meshVertBufA, &meshVertBufMemA);
+    int attrDims[3] = {3, 2, 3};
+    if (veshInitializeStyle(&style, 3, attrDims) != 0) {
         shaFinalize(&shaProg);
         return 4;
     }
-    if (meshInitializeIndexBuffer(
-            &meshTriBufB, &meshTriBufMemB, meshNumTrisB, meshTrisB) != 0) {
-        meshFinalizeVertexBuffer(&meshVertBufB, &meshVertBufMemB);
-        meshFinalizeIndexBuffer(&meshTriBufA, &meshTriBufMemA);
-        meshFinalizeVertexBuffer(&meshVertBufA, &meshVertBufMemA);
+    if (initializeVeshes() != 0) {
+        veshFinalizeStyle(&style);
         shaFinalize(&shaProg);
         return 3;
+    }
+    if (initializeTextures() != 0) {
+        finalizeVeshes();
+        veshFinalizeStyle(&style);
+        shaFinalize(&shaProg);
+        return 2;
+    }
+    if (initializeScene() != 0) {
+        finalizeTextures();
+        finalizeVeshes();
+        veshFinalizeStyle(&style);
+        shaFinalize(&shaProg);
+        return 1;
     }
     return 0;
 }
 
 /* Releases the artwork resources. */
 void finalizeArtwork() {
-    meshFinalizeIndexBuffer(&meshTriBufB, &meshTriBufMemB);
-    meshFinalizeVertexBuffer(&meshVertBufB, &meshVertBufMemB);
-    meshFinalizeIndexBuffer(&meshTriBufA, &meshTriBufMemA);
-    meshFinalizeVertexBuffer(&meshVertBufA, &meshVertBufMemA);
+    /* New: New helper functions. */
+    finalizeScene();
+    finalizeTextures();
+    finalizeVeshes();
+    veshFinalizeStyle(&style);
     shaFinalize(&shaProg);
 }
 
@@ -236,96 +385,51 @@ void finalizeArtwork() {
 
 /*** UNIFORM PART OF CONNECTION BETWEEN SWAP CHAIN AND SCENE ******************/
 
+/* New: I've removed the color, because it was a mostly useless example. */
 typedef struct SceneUniforms SceneUniforms;
 struct SceneUniforms {
-    float color[4];
     float cameraT[4][4];
 };
 
 VkBuffer *sceneUniformBuffers;
 VkDeviceMemory *sceneUniformBuffersMemory;
 
-/* Called by presentFrame. Copies a UBO from the CPU side to the GPU side, so 
-that the shaders can access its contents. */
+/* Configures the scene uniforms for a single frame. */
 void setSceneUniforms(uint32_t imageIndex) {
-    float soFarTime = gui.currentTime - gui.startTime;
     SceneUniforms sceneUnifs;
-    /* Set the color member of the scene uniforms. */
-    sceneUnifs.color[0] = 1.0;
-    sceneUnifs.color[1] = 1.0;
-    sceneUnifs.color[2] = 1.0;
-    sceneUnifs.color[3] = 1.0;
-    /* Here's the camera matrix from our previous vertex shader. */  
-    float previous[4][4] = {
-        {3.700123, -0.487130, 0.000000, 0.000000},      // row 0, not column 0
-        {-0.344453, -2.616382, -2.638959, 0.000004},    // row 1
-        {0.093228, 0.708139, -0.714249, 9.090910},      // row 2
-        {0.092296, 0.701057, -0.707107, 10.000000}};    // row 3
-    /* Here's a rotation that we can animate, to revolve the camera about its 
-    target. */
-    float rotation[4][4] = {
-        {cos(soFarTime), -sin(soFarTime), 0.0, 0.0},    // row 0, not column 0
-        {sin(soFarTime), cos(soFarTime), 0.0, 0.0},     // row 1
-        {0.0, 0.0, 1.0, 0.0},                           // row 2
-        {0.0, 0.0, 0.0, 1.0}};                          // row 3
-    /* The overall camera matrix is the matrix product of those two. */
-    float camera[4][4];
-    for (int i = 0; i < 4; i += 1)
-        for (int j = 0; j < 4; j += 1) {
-            camera[i][j] = 0.0;
-            for (int k = 0; k < 4; k += 1)
-                camera[i][j] += previous[i][k] * rotation[k][j];
-        }
-    /* Transpose that camera matrix into the scene UBO. */
-    for (int i = 0; i < 4; i += 1)
-        for (int j = 0; j < 4; j += 1)
-            sceneUnifs.cameraT[i][j] = camera[j][i];
-	/* Copy the scene UBO bits from the CPU to the GPU. */
+    /* New: Update the camera. */
+    setCamera();
+    float cam[4][4];
+    camGetProjectionInverseIsometry(&camera, cam);
+    mat44Transpose(cam, sceneUnifs.cameraT);
+    /* Copy the bits. */
 	void *data;
 	vkMapMemory(
 	    vul.device, sceneUniformBuffersMemory[imageIndex], 0, 
-	    sizeof(sceneUnifs), 0, &data);
-	memcpy(data, &sceneUnifs, sizeof(sceneUnifs));
+	    sizeof(SceneUniforms), 0, &data);
+	memcpy(data, &sceneUnifs, sizeof(SceneUniforms));
 	vkUnmapMemory(vul.device, sceneUniformBuffersMemory[imageIndex]);
 }
 
-/* New: This data structure holds our body-specific uniforms. Don't forget to 
-transpose the modeling matrix when you copy it into here. */
-typedef struct BodyUniforms BodyUniforms;
-struct BodyUniforms {
-    float modelingT[4][4];
-};
-
-/* New: GPU-side buffers for body-specific uniforms. And a body count (which 
-should really be in the artwork section above?). And a CPU-side buffer that 
-is aware of the alignment rules of the GPU. */
 VkBuffer *bodyUniformBuffers;
 VkDeviceMemory *bodyUniformBuffersMemory;
-int bodyNum = 2;
 unifAligned aligned;
 
-/* New: Configures the body uniforms for a single frame. */
+/* New: Much of this function's code. Configures the body uniforms for a single 
+frame. */
 void setBodyUniforms(uint32_t imageIndex) {
-    float soFarTime = gui.currentTime - gui.startTime;
-    /* Place a trivial isometry into the first body's modeling matrix. */
-    BodyUniforms *bodyUnifs = (BodyUniforms *)unifGetAligned(&aligned, 0);
 
-    float trans[3] = {cos(soFarTime), 2.0, 0.0};
-    isoSetTranslation(&isoA, trans);
+    setHero();
+    float axis[3] = {0.0, 0.0, 1.0};
+    float rot[3][3], homog[4][4];
+    mat33AngleAxisRotation(heroHeading, axis, rot);
+    isoSetRotation(&bodyH.isometry, rot);
+    isoSetTranslation(&bodyH.isometry, heroPos);
 
+    bodySetUniforms(&bodyL, &aligned, 0);
+    bodySetUniforms(&bodyW, &aligned, 1);
+    bodySetUniforms(&bodyH, &aligned, 2);
 
-    float homog[4][4];
-    isoGetHomogeneous(&isoA, homog);    
-    mat44Transpose(homog, bodyUnifs->modelingT);
-    
-    /* Place a (transposed) rotation into the second body's modeling matrix. */
-    bodyUnifs = (BodyUniforms *)unifGetAligned(&aligned, 1);
-
-    float transB[3] = {sin(soFarTime), 1.0, 0.0};
-    isoSetTranslation(&isoB, transB);
-
-    isoGetHomogeneous(&isoB, homog);    
-    mat44Transpose(homog, bodyUnifs->modelingT);
 
     /* Copy the body UBO bits from the CPU to the GPU. */
     void *data;
@@ -336,20 +440,20 @@ void setBodyUniforms(uint32_t imageIndex) {
 	vkUnmapMemory(vul.device, bodyUniformBuffersMemory[imageIndex]);
 }
 
-/* New: Now we have two uniforms to describe. The new uniform is dynamic, which 
-for us basically means per-body. We make it available to the vertex shader only, 
-and we bind it to 'binding = 1' there. */
 #define UNIFSCENE 0
 #define UNIFBODY 1
-#define UNIFNUM 2
-int descriptorCounts[UNIFNUM] = {1, 1};
+#define UNIFTEX 2
+#define UNIFNUM 3
+int descriptorCounts[UNIFNUM] = {1, 1, 3};
 VkDescriptorType descriptorTypes[UNIFNUM] = {
     VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 
-    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC};
+    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 
+    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER};
 VkShaderStageFlags descriptorStageFlagss[UNIFNUM] = {
     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 
-    VK_SHADER_STAGE_VERTEX_BIT};
-int descriptorBindings[UNIFNUM] = {0, 1};
+    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 
+    VK_SHADER_STAGE_FRAGMENT_BIT};
+int descriptorBindings[UNIFNUM] = {0, 1, 2};
 
 descDescription desc;
 
@@ -357,7 +461,7 @@ descDescription desc;
 that are difficult to abstract. The i argument specifies which element of the 
 swap chain we're operating on. */
 void setDescriptorSet(descDescription *desc, int i) {
-    /* Update the descriptor for the scene UBO. */
+    /* Prepare to update the descriptor for the scene UBO. */
     VkDescriptorBufferInfo sceneUBOInfo = {0};
     sceneUBOInfo.buffer = sceneUniformBuffers[i];
     sceneUBOInfo.offset = 0;
@@ -371,7 +475,7 @@ void setDescriptorSet(descDescription *desc, int i) {
     sceneUBOWrite.descriptorType = descriptorTypes[UNIFSCENE];
     sceneUBOWrite.descriptorCount = descriptorCounts[UNIFSCENE];
     sceneUBOWrite.pBufferInfo = sceneUBODescBufInfos;
-    /* New: Update the descriptor for the body UBO. */
+    /* Prepare to update the descriptor for the body UBO. */
     VkDescriptorBufferInfo bodyUBOInfo = {0};
     bodyUBOInfo.buffer = bodyUniformBuffers[i];
     bodyUBOInfo.offset = 0;
@@ -385,9 +489,27 @@ void setDescriptorSet(descDescription *desc, int i) {
     bodyUBOWrite.descriptorCount = descriptorCounts[UNIFBODY];
     bodyUBOWrite.descriptorType = descriptorTypes[UNIFBODY];
     bodyUBOWrite.pBufferInfo = bodyUBODescBufInfos;
-    /* New: We now have two descriptors to update. */
-    VkWriteDescriptorSet descWrites[] = {sceneUBOWrite, bodyUBOWrite};
-    vkUpdateDescriptorSets(vul.device, 2, descWrites, 0, NULL);
+    /* Prepare to update texNum descriptors for the texture array. */
+    VkDescriptorImageInfo descriptorImageInfos[TEXNUM];
+    for (int i = 0; i < TEXNUM; i += 1) {
+        VkDescriptorImageInfo imageInfo = {0};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = texImViews[i];
+        imageInfo.sampler = texSamps[i];
+        descriptorImageInfos[i] = imageInfo;
+    }
+    VkWriteDescriptorSet samplerWrite = {0};
+    samplerWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    samplerWrite.dstSet = desc->descriptorSets[i];
+    samplerWrite.dstBinding = descriptorBindings[UNIFTEX];
+    samplerWrite.dstArrayElement = 0;
+    samplerWrite.descriptorType = descriptorTypes[UNIFTEX];
+    samplerWrite.descriptorCount = descriptorCounts[UNIFTEX];
+    samplerWrite.pImageInfo = descriptorImageInfos;
+    /* Update the three descriptors. */
+    VkWriteDescriptorSet descWrites[] = {
+        sceneUBOWrite, bodyUBOWrite, samplerWrite};
+    vkUpdateDescriptorSets(vul.device, 3, descWrites, 0, NULL);
 }
 
 /* Initializes all of the machinery for communicating uniforms to shaders. 
@@ -398,14 +520,12 @@ int initializeUniforms() {
             &sceneUniformBuffers, &sceneUniformBuffersMemory, 
             sizeof(SceneUniforms)) != 0)
         return 4;
-    /* New: Initialize buffers to hold the body uniforms on the GPU. */
     if (unifInitializeBuffers(
             &bodyUniformBuffers, &bodyUniformBuffersMemory, 
             bodyNum * unifAlignment(sizeof(BodyUniforms))) != 0) {
         unifFinalizeBuffers(&sceneUniformBuffers, &sceneUniformBuffersMemory);
         return 3;
     }
-    /* New: Initialize buffers to hold the body uniforms on the CPU. */
     if (unifInitializeAligned(&aligned, bodyNum, sizeof(BodyUniforms)) != 0) {
         unifFinalizeBuffers(&bodyUniformBuffers, &bodyUniformBuffersMemory);
         unifFinalizeBuffers(&sceneUniformBuffers, &sceneUniformBuffersMemory);
@@ -425,7 +545,6 @@ int initializeUniforms() {
 /* Releases the resources backing all of the uniform machinery. */
 void finalizeUniforms() {
     descFinalize(&desc);
-    /* New: Finalize the buffers to hold the body uniforms. */
     unifFinalizeAligned(&aligned);
     unifFinalizeBuffers(&bodyUniformBuffers, &bodyUniformBuffersMemory);
     unifFinalizeBuffers(&sceneUniformBuffers, &sceneUniformBuffersMemory);
@@ -665,40 +784,14 @@ int initializeCommandBuffers() {
         vkCmdBindPipeline(
             connCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, 
             connGraphicsPipeline);
-        /* New: At the end of the call to bind the descriptor set, we pass along 
-        one offset into the body UBO. To clarify, the body UBO contains data for 
-        all of the bodies. What's really specific to one body versus another is 
-        this offset right here. */
-        uint32_t bodyUBOOffset = 0;
-        vkCmdBindDescriptorSets(
-            connCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, 
-            connPipelineLayout, 0, 1, &(desc.descriptorSets[i]), 1, 
-            &bodyUBOOffset);
-        /* Render a mesh. */
-        VkDeviceSize offsets[] = {0};
-        VkBuffer vertexBuffers[] = {meshVertBufA};
-        vkCmdBindVertexBuffers(
-            connCommandBuffers[i], 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(
-            connCommandBuffers[i], meshTriBufA, 0, VK_INDEX_TYPE_UINT16);
-        vkCmdDrawIndexed(
-            connCommandBuffers[i], (uint32_t)(meshNumTrisA * 3), 1, 0, 0, 0);
-        /* New: We again pass an offset into the body UBO, incremented to 
-        indicate the next body. */
-        bodyUBOOffset += unifAlignment(sizeof(BodyUniforms));
-        vkCmdBindDescriptorSets(
-            connCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, 
-            connPipelineLayout, 0, 1, &(desc.descriptorSets[i]), 1, 
-            &bodyUBOOffset);
-        /* Render another mesh. */
-        vertexBuffers[0] = meshVertBufB;
-        vkCmdBindVertexBuffers(
-            connCommandBuffers[i], 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(
-            connCommandBuffers[i], meshTriBufB, 0, VK_INDEX_TYPE_UINT16);
-        vkCmdDrawIndexed(
-            connCommandBuffers[i], (uint32_t)(meshNumTrisB * 3), 1, 0, 0, 0);
-        /* End render pass and command buffer. */
+
+
+        bodyRender(&bodyL, &connCommandBuffers[i], &connPipelineLayout, &(desc.descriptorSets[i]), &aligned, 0);
+
+        bodyRender(&bodyW, &connCommandBuffers[i], &connPipelineLayout, &(desc.descriptorSets[i]), &aligned, 1);
+        
+        bodyRender(&bodyH, &connCommandBuffers[i], &connPipelineLayout, &(desc.descriptorSets[i]), &aligned, 2);
+
         vkCmdEndRenderPass(connCommandBuffers[i]);
         if (vkEndCommandBuffer(connCommandBuffers[i]) != VK_SUCCESS) {
             fprintf(stderr, "error: initializeCommandBuffers: ");
@@ -724,7 +817,9 @@ when you're done. */
 int initializeConnection() {
     if (initializeUniforms() != 0)
         return 3;
-    if (initializePipeline(&shaProg, &vertexInputInfo, &inputAssembly) != 0) {
+    /* New: Use the mesh style. */
+    if (initializePipeline(
+            &shaProg, &(style.vertexInputInfo), &(style.inputAssembly)) != 0) {
         finalizeUniforms();
         return 2;
     }
@@ -793,7 +888,7 @@ int presentFrame() {
         vkWaitForFences(
             vul.device, 1, &swap.imagesInFlight[imageIndex], VK_TRUE, 
             UINT64_MAX);
-    /* New: Send data to the scene and body UBOs in the shaders. */
+    /* Send data to the scene and body UBOs in the shaders. */
     setSceneUniforms(imageIndex);
     setBodyUniforms(imageIndex);
     /* Prepare to submit a request to render the new frame. */
@@ -846,6 +941,58 @@ int presentFrame() {
     return 0;
 }
 
+/* New: This whole function. */
+void handleKey(
+        GLFWwindow *window, int key, int scancode, int action, int mods) {
+    /* Detect which modifier keys are down. */
+    int shiftIsDown, controlIsDown, altOptionIsDown, superCommandIsDown;
+    shiftIsDown = mods & GLFW_MOD_SHIFT;
+    controlIsDown = mods & GLFW_MOD_CONTROL;
+    altOptionIsDown = mods & GLFW_MOD_ALT;
+    superCommandIsDown = mods & GLFW_MOD_SUPER;
+    /* Handle the camera. */
+    if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+        if (camera.projectionType == camORTHOGRAPHIC)
+            camSetProjectionType(&camera, camPERSPECTIVE);
+        else
+            camSetProjectionType(&camera, camORTHOGRAPHIC);
+    } else if (key == GLFW_KEY_J)
+        cameraTheta -= M_PI / 36.0;
+    else if (key == GLFW_KEY_L)
+        cameraTheta += M_PI / 36.0;
+    else if (key == GLFW_KEY_I)
+        cameraPhi -= M_PI / 36.0;
+    else if (key == GLFW_KEY_K)
+        cameraPhi += M_PI / 36.0;
+    else if (key == GLFW_KEY_O)
+        cameraRho *= 0.95;
+    else if (key == GLFW_KEY_U)
+        cameraRho *= 1.05;
+    /* Update which hero keys are down. They affect the hero automatically on 
+    each time step. */
+    if (key == GLFW_KEY_W) {
+        if (action == GLFW_PRESS)
+            heroWDown = 1;
+        else if (action == GLFW_RELEASE)
+            heroWDown = 0;
+    } if (key == GLFW_KEY_S) {
+        if (action == GLFW_PRESS)
+            heroSDown = 1;
+        else if (action == GLFW_RELEASE)
+            heroSDown = 0;
+    } if (key == GLFW_KEY_A) {
+        if (action == GLFW_PRESS)
+            heroADown = 1;
+        else if (action == GLFW_RELEASE)
+            heroADown = 0;
+    } if (key == GLFW_KEY_D) {
+        if (action == GLFW_PRESS)
+            heroDDown = 1;
+        else if (action == GLFW_RELEASE)
+            heroDDown = 0;
+    }
+}
+
 int main() {
     if (guiInitialize(&gui, 512, 512, "Vulkan") != 0)
         return 5;
@@ -872,6 +1019,8 @@ int main() {
         return 1;
     }
     guiSetFramePresenter(&gui, presentFrame);
+    /* New: Register the keyboard handler. */
+    glfwSetKeyCallback(gui.window, handleKey);
     guiRun(&gui);
     vkDeviceWaitIdle(vul.device);
     finalizeConnection();

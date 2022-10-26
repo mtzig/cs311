@@ -1,37 +1,29 @@
 
-/* Thomas Zeng & Kyosuke */
+
 
 /*
 
-This file is the fifth step in my Vulkan tutorials, which are based on the 2020 
-April version of Alexander Overvoorde's Vulkan tutorial at 
+This file is the sixth and final step in my Vulkan tutorials, which are based on 
+the 2020 April version of Alexander Overvoorde's Vulkan tutorial at 
     https://www.vulkan-tutorial.com/
 in consultation with the Vulkan Programming Guide by Graham Sellers and other 
-sources. In this step, we introduce uniforms, such as a 4x4 modeling matrix,  
-that have body-specific values. Because there may be many bodies, we need to 
-maintain arrays of these uniforms. An annoying wrinkle is that the GPU has rules 
-about how these arrays are aligned in memory. Anyway, the resulting program 
-rotates one of the meshes, but not the other, while the camera revolves around 
-both of them. Code that is new, compared to the preceding tutorial, is marked 
-'New' in the comments.
-
-(By the way, a Vulkan feature called 'push constants' might appear ideal for 
-this purpose, but changing push constant values requires rebuilding the command 
-buffers, which I don't want to do on each animation frame.)
+sources. In this step, we introduce three textures, mapping two of them onto 
+each mesh. Code that is new, compared to the preceding tutorial, is marked 'New' 
+in the comments.
 
 On macOS, make sure that NUMDEVICEEXT below is 2, and then compile with 
-    clang 510mainUniforms.c -lglfw -lvulkan
+    clang 520mainTextures.c -lglfw -lvulkan
 You might also need to compile the shaders with 
-    glslc 500shader.vert -o 500vert.spv
-    glslc 480shader.frag -o 480frag.spv
+    glslc 520shader.vert -o 520vert.spv
+    glslc 520shader.frag -o 520frag.spv
 Then run the program with 
     ./a.out
 
 On Linux, make sure that NUMDEVICEEXT below is 1, and then compile with 
-    clang 500mainUniforms.c -lglfw -lvulkan -lm
+    clang 520mainTextures.c -lglfw -lvulkan -lm
 You might also need to compile the shaders with 
-    /mnt/c/VulkanSDK/1.3.216.0/Bin/glslc.exe 500shader.vert -o 500vert.spv
-    /mnt/c/VulkanSDK/1.3.216.0/Bin/glslc.exe 480shader.frag -o 480frag.spv
+    /mnt/c/VulkanSDK/1.3.216.0/Bin/glslc.exe 520shader.vert -o 520vert.spv
+    /mnt/c/VulkanSDK/1.3.216.0/Bin/glslc.exe 520shader.frag -o 520frag.spv
 (You might have to change the SDK version number to match your installation.) 
 Then run the program with 
     ./a.out
@@ -48,6 +40,10 @@ If you see errors, then try changing ANISOTROPY to 0 and/or MAXFRAMESINFLIGHT to
 #include <GLFW/glfw3.h>
 #include <sys/time.h>
 #include <math.h>
+/* New: Include the STB Image library. (This header file contains not just the 
+interfaces but also the implementations.) */
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 
 
@@ -102,10 +98,9 @@ swapChain swap;
 #include "460mesh.c"
 #include "480uniform.c"
 #include "480description.c"
-#include "470vector.c"
-#include "490matrix.c"
-#include "490isometry.c"
 
+/* New: One file, which provides texture and sampler machinery. */
+#include "520texture.c"
 
 
 
@@ -169,24 +164,22 @@ VkDeviceMemory meshVertBufMemB;
 VkBuffer meshTriBufB;
 VkDeviceMemory meshTriBufMemB;
 
-isoIsometry isoA, isoB;
+/* New: Declare two samplers and three textures. Each texture requires three 
+Vulkan data structures: an image, a memory buffer, and an image view. For the 
+sake of setDescriptorSet, it is convenient to have the texture image views in an 
+array and the samplers in a matching array. */
+#define TEXNUM 3
+VkSampler texSampRepeat, texSampClamp;
+VkSampler texSamps[TEXNUM];
+VkImage texIms[TEXNUM];
+VkDeviceMemory texImMems[TEXNUM];
+VkImageView texImViews[TEXNUM];
 
 /* Initializes the artwork. Upon success (return code 0), don't forget to 
 finalizeArtwork later. */
 int initializeArtwork() {
-
-    float rot[3][3] = {
-        {1.0, 0.0, 0.0},
-        {0.0, 1.0, 0.0},
-        {0.0, 0.0, 1.0}}; 
-
-    isoSetRotation(&isoA, rot);
-    isoSetRotation(&isoB, rot);
-
-
-
-    /* New: Load the updated vertex shader. */
-    if (shaInitialize(&shaProg, "500vert.spv", "480frag.spv") != 0) {
+    /* New: Load the updated shaders. */
+    if (shaInitialize(&shaProg, "520vert.spv", "520frag.spv") != 0) {
         return 7;
     }
     meshGetStyle(
@@ -220,11 +213,82 @@ int initializeArtwork() {
         shaFinalize(&shaProg);
         return 3;
     }
+    /* New: Initialize two samplers (and finalize if errors happen). */
+    if (texInitializeSampler(
+            &texSampRepeat, VK_SAMPLER_ADDRESS_MODE_REPEAT, 
+            VK_SAMPLER_ADDRESS_MODE_REPEAT) != 0) {
+        meshFinalizeIndexBuffer(&meshTriBufB, &meshTriBufMemB);
+        meshFinalizeVertexBuffer(&meshVertBufB, &meshVertBufMemB);
+        meshFinalizeIndexBuffer(&meshTriBufA, &meshTriBufMemA);
+        meshFinalizeVertexBuffer(&meshVertBufA, &meshVertBufMemA);
+        shaFinalize(&shaProg);
+        return 2;
+    }
+    if (texInitializeSampler(
+            &texSampClamp, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 
+            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE) != 0) {
+        texFinalizeSampler(&texSampRepeat);
+        meshFinalizeIndexBuffer(&meshTriBufB, &meshTriBufMemB);
+        meshFinalizeVertexBuffer(&meshVertBufB, &meshVertBufMemB);
+        meshFinalizeIndexBuffer(&meshTriBufA, &meshTriBufMemA);
+        meshFinalizeVertexBuffer(&meshVertBufA, &meshVertBufMemA);
+        shaFinalize(&shaProg);
+        return 2;
+    }
+    /* New: The first sampler acts on the first two textures. The second sampler 
+    acts on the third texture. My point is that you don't need a separate 
+    sampler for each texture; you can reuse samplers. */
+    texSamps[0] = texSampRepeat;
+    texSamps[1] = texSampRepeat;
+    texSamps[2] = texSampClamp;
+    /* New: Initialize three textures (and finalize if errors happen). */
+    if (texInitializeFile(
+            &texIms[0], &texImMems[0], &texImViews[0], "grayish.png") != 0) {
+        texFinalizeSampler(&texSampClamp);
+        texFinalizeSampler(&texSampRepeat);
+        meshFinalizeIndexBuffer(&meshTriBufB, &meshTriBufMemB);
+        meshFinalizeVertexBuffer(&meshVertBufB, &meshVertBufMemB);
+        meshFinalizeIndexBuffer(&meshTriBufA, &meshTriBufMemA);
+        meshFinalizeVertexBuffer(&meshVertBufA, &meshVertBufMemA);
+        shaFinalize(&shaProg);
+        return 1;
+    }
+    if (texInitializeFile(
+            &texIms[1], &texImMems[1], &texImViews[1], "bluish.png") != 0) {
+        texFinalize(&texIms[0], &texImMems[0], &texImViews[0]);
+        texFinalizeSampler(&texSampClamp);
+        texFinalizeSampler(&texSampRepeat);
+        meshFinalizeIndexBuffer(&meshTriBufB, &meshTriBufMemB);
+        meshFinalizeVertexBuffer(&meshVertBufB, &meshVertBufMemB);
+        meshFinalizeIndexBuffer(&meshTriBufA, &meshTriBufMemA);
+        meshFinalizeVertexBuffer(&meshVertBufA, &meshVertBufMemA);
+        shaFinalize(&shaProg);
+        return 1;
+    }
+    if (texInitializeFile(
+            &texIms[2], &texImMems[2], &texImViews[2], "reddish.png") != 0) {
+        texFinalize(&texIms[1], &texImMems[1], &texImViews[1]);
+        texFinalize(&texIms[0], &texImMems[0], &texImViews[0]);
+        texFinalizeSampler(&texSampClamp);
+        texFinalizeSampler(&texSampRepeat);
+        meshFinalizeIndexBuffer(&meshTriBufB, &meshTriBufMemB);
+        meshFinalizeVertexBuffer(&meshVertBufB, &meshVertBufMemB);
+        meshFinalizeIndexBuffer(&meshTriBufA, &meshTriBufMemA);
+        meshFinalizeVertexBuffer(&meshVertBufA, &meshVertBufMemA);
+        shaFinalize(&shaProg);
+        return 1;
+    }
     return 0;
 }
 
 /* Releases the artwork resources. */
 void finalizeArtwork() {
+    /* New: Finalize the textures and the samplers. */
+    texFinalize(&texIms[2], &texImMems[2], &texImViews[2]);
+    texFinalize(&texIms[1], &texImMems[1], &texImViews[1]);
+    texFinalize(&texIms[0], &texImMems[0], &texImViews[0]);
+    texFinalizeSampler(&texSampClamp);
+    texFinalizeSampler(&texSampRepeat);
     meshFinalizeIndexBuffer(&meshTriBufB, &meshTriBufMemB);
     meshFinalizeVertexBuffer(&meshVertBufB, &meshVertBufMemB);
     meshFinalizeIndexBuffer(&meshTriBufA, &meshTriBufMemA);
@@ -245,30 +309,24 @@ struct SceneUniforms {
 VkBuffer *sceneUniformBuffers;
 VkDeviceMemory *sceneUniformBuffersMemory;
 
-/* Called by presentFrame. Copies a UBO from the CPU side to the GPU side, so 
-that the shaders can access its contents. */
+/* Configures the scene uniforms for a single frame. */
 void setSceneUniforms(uint32_t imageIndex) {
     float soFarTime = gui.currentTime - gui.startTime;
     SceneUniforms sceneUnifs;
-    /* Set the color member of the scene uniforms. */
     sceneUnifs.color[0] = 1.0;
     sceneUnifs.color[1] = 1.0;
     sceneUnifs.color[2] = 1.0;
     sceneUnifs.color[3] = 1.0;
-    /* Here's the camera matrix from our previous vertex shader. */  
     float previous[4][4] = {
         {3.700123, -0.487130, 0.000000, 0.000000},      // row 0, not column 0
         {-0.344453, -2.616382, -2.638959, 0.000004},    // row 1
         {0.093228, 0.708139, -0.714249, 9.090910},      // row 2
         {0.092296, 0.701057, -0.707107, 10.000000}};    // row 3
-    /* Here's a rotation that we can animate, to revolve the camera about its 
-    target. */
     float rotation[4][4] = {
         {cos(soFarTime), -sin(soFarTime), 0.0, 0.0},    // row 0, not column 0
         {sin(soFarTime), cos(soFarTime), 0.0, 0.0},     // row 1
         {0.0, 0.0, 1.0, 0.0},                           // row 2
         {0.0, 0.0, 0.0, 1.0}};                          // row 3
-    /* The overall camera matrix is the matrix product of those two. */
     float camera[4][4];
     for (int i = 0; i < 4; i += 1)
         for (int j = 0; j < 4; j += 1) {
@@ -276,57 +334,61 @@ void setSceneUniforms(uint32_t imageIndex) {
             for (int k = 0; k < 4; k += 1)
                 camera[i][j] += previous[i][k] * rotation[k][j];
         }
-    /* Transpose that camera matrix into the scene UBO. */
     for (int i = 0; i < 4; i += 1)
         for (int j = 0; j < 4; j += 1)
             sceneUnifs.cameraT[i][j] = camera[j][i];
-	/* Copy the scene UBO bits from the CPU to the GPU. */
 	void *data;
 	vkMapMemory(
 	    vul.device, sceneUniformBuffersMemory[imageIndex], 0, 
-	    sizeof(sceneUnifs), 0, &data);
-	memcpy(data, &sceneUnifs, sizeof(sceneUnifs));
+	    sizeof(SceneUniforms), 0, &data);
+	memcpy(data, &sceneUnifs, sizeof(SceneUniforms));
 	vkUnmapMemory(vul.device, sceneUniformBuffersMemory[imageIndex]);
 }
 
-/* New: This data structure holds our body-specific uniforms. Don't forget to 
-transpose the modeling matrix when you copy it into here. */
 typedef struct BodyUniforms BodyUniforms;
 struct BodyUniforms {
     float modelingT[4][4];
+    /* New: An array of indices into the texture array. We use only two of the 
+    indices, but it's easiest to declare them four at a time. If you wanted to 
+    use five textures on each body, for example, then you would have two of 
+    these arrays, and three of the eight indices would go unused. */
+    uint32_t texIndices[4];
 };
 
-/* New: GPU-side buffers for body-specific uniforms. And a body count (which 
-should really be in the artwork section above?). And a CPU-side buffer that 
-is aware of the alignment rules of the GPU. */
 VkBuffer *bodyUniformBuffers;
 VkDeviceMemory *bodyUniformBuffersMemory;
 int bodyNum = 2;
 unifAligned aligned;
 
-/* New: Configures the body uniforms for a single frame. */
+/* Configures the body uniforms for a single frame. */
 void setBodyUniforms(uint32_t imageIndex) {
     float soFarTime = gui.currentTime - gui.startTime;
     /* Place a trivial isometry into the first body's modeling matrix. */
     BodyUniforms *bodyUnifs = (BodyUniforms *)unifGetAligned(&aligned, 0);
-
-    float trans[3] = {cos(soFarTime), 2.0, 0.0};
-    isoSetTranslation(&isoA, trans);
-
-
-    float homog[4][4];
-    isoGetHomogeneous(&isoA, homog);    
-    mat44Transpose(homog, bodyUnifs->modelingT);
-    
+    float identity[4][4] = {
+        {1.0, 0.0, 0.0, 0.0},                           // row 0, not column 0
+        {0.0, 1.0, 0.0, 0.0},                           // row 1
+        {0.0, 0.0, 1.0, 0.0},                           // row 2
+        {0.0, 0.0, 0.0, 1.0}};                          // row 3
+    for (int i = 0; i < 4; i += 1)
+        for (int j = 0; j < 4; j += 1)
+            bodyUnifs->modelingT[i][j] = identity[j][i];
+    /* New: This body uses the first two textures. */
+    bodyUnifs->texIndices[0] = 0;
+    bodyUnifs->texIndices[1] = 1;
     /* Place a (transposed) rotation into the second body's modeling matrix. */
     bodyUnifs = (BodyUniforms *)unifGetAligned(&aligned, 1);
-
-    float transB[3] = {sin(soFarTime), 1.0, 0.0};
-    isoSetTranslation(&isoB, transB);
-
-    isoGetHomogeneous(&isoB, homog);    
-    mat44Transpose(homog, bodyUnifs->modelingT);
-
+    float rotation[4][4] = {
+        {1.0, 0.0, 0.0, 0.0},                           // row 0, not column 0
+        {0.0, cos(soFarTime), -sin(soFarTime), 0.0},    // row 1
+        {0.0, sin(soFarTime), cos(soFarTime), 0.0},     // row 2
+        {0.0, 0.0, 0.0, 1.0}};                          // row 3
+    for (int i = 0; i < 4; i += 1)
+        for (int j = 0; j < 4; j += 1)
+            bodyUnifs->modelingT[i][j] = rotation[j][i];
+    /* New: This body uses the first and third textures. */
+    bodyUnifs->texIndices[0] = 0;
+    bodyUnifs->texIndices[1] = 2;
     /* Copy the body UBO bits from the CPU to the GPU. */
     void *data;
     int amount = aligned.uboNum * aligned.alignedSize;
@@ -336,20 +398,26 @@ void setBodyUniforms(uint32_t imageIndex) {
 	vkUnmapMemory(vul.device, bodyUniformBuffersMemory[imageIndex]);
 }
 
-/* New: Now we have two uniforms to describe. The new uniform is dynamic, which 
-for us basically means per-body. We make it available to the vertex shader only, 
-and we bind it to 'binding = 1' there. */
+/* New: Now we have a third uniform to describe: the texture array. */
 #define UNIFSCENE 0
 #define UNIFBODY 1
-#define UNIFNUM 2
-int descriptorCounts[UNIFNUM] = {1, 1};
+#define UNIFTEX 2
+#define UNIFNUM 3
+/* New: The three textures require one descriptor each. */
+int descriptorCounts[UNIFNUM] = {1, 1, 3};
+/* New: We pair each texture with a sampler. */
 VkDescriptorType descriptorTypes[UNIFNUM] = {
     VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 
-    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC};
+    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 
+    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER};
+/* New: We make the body uniforms available to both shader stages, and we make 
+the texture array available to the fragment shader only. */
 VkShaderStageFlags descriptorStageFlagss[UNIFNUM] = {
     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 
-    VK_SHADER_STAGE_VERTEX_BIT};
-int descriptorBindings[UNIFNUM] = {0, 1};
+    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 
+    VK_SHADER_STAGE_FRAGMENT_BIT};
+/* New: The texture array connects to 'binding = 2' in the shader. */
+int descriptorBindings[UNIFNUM] = {0, 1, 2};
 
 descDescription desc;
 
@@ -371,7 +439,7 @@ void setDescriptorSet(descDescription *desc, int i) {
     sceneUBOWrite.descriptorType = descriptorTypes[UNIFSCENE];
     sceneUBOWrite.descriptorCount = descriptorCounts[UNIFSCENE];
     sceneUBOWrite.pBufferInfo = sceneUBODescBufInfos;
-    /* New: Update the descriptor for the body UBO. */
+    /* Update the descriptor for the body UBO. */
     VkDescriptorBufferInfo bodyUBOInfo = {0};
     bodyUBOInfo.buffer = bodyUniformBuffers[i];
     bodyUBOInfo.offset = 0;
@@ -385,9 +453,27 @@ void setDescriptorSet(descDescription *desc, int i) {
     bodyUBOWrite.descriptorCount = descriptorCounts[UNIFBODY];
     bodyUBOWrite.descriptorType = descriptorTypes[UNIFBODY];
     bodyUBOWrite.pBufferInfo = bodyUBODescBufInfos;
-    /* New: We now have two descriptors to update. */
-    VkWriteDescriptorSet descWrites[] = {sceneUBOWrite, bodyUBOWrite};
-    vkUpdateDescriptorSets(vul.device, 2, descWrites, 0, NULL);
+    /* New: Make TEXNUM descriptors for the texture array. */
+    VkDescriptorImageInfo descriptorImageInfos[TEXNUM];
+    for (int i = 0; i < TEXNUM; i += 1) {
+        VkDescriptorImageInfo imageInfo = {0};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = texImViews[i];
+        imageInfo.sampler = texSamps[i];
+        descriptorImageInfos[i] = imageInfo;
+    }
+    VkWriteDescriptorSet samplerWrite = {0};
+    samplerWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    samplerWrite.dstSet = desc->descriptorSets[i];
+    samplerWrite.dstBinding = descriptorBindings[UNIFTEX];
+    samplerWrite.dstArrayElement = 0;
+    samplerWrite.descriptorType = descriptorTypes[UNIFTEX];
+    samplerWrite.descriptorCount = descriptorCounts[UNIFTEX];
+    samplerWrite.pImageInfo = descriptorImageInfos;
+    /* We now have three descriptors to update. */
+    VkWriteDescriptorSet descWrites[] = {
+        sceneUBOWrite, bodyUBOWrite, samplerWrite};
+    vkUpdateDescriptorSets(vul.device, 3, descWrites, 0, NULL);
 }
 
 /* Initializes all of the machinery for communicating uniforms to shaders. 
@@ -398,14 +484,12 @@ int initializeUniforms() {
             &sceneUniformBuffers, &sceneUniformBuffersMemory, 
             sizeof(SceneUniforms)) != 0)
         return 4;
-    /* New: Initialize buffers to hold the body uniforms on the GPU. */
     if (unifInitializeBuffers(
             &bodyUniformBuffers, &bodyUniformBuffersMemory, 
             bodyNum * unifAlignment(sizeof(BodyUniforms))) != 0) {
         unifFinalizeBuffers(&sceneUniformBuffers, &sceneUniformBuffersMemory);
         return 3;
     }
-    /* New: Initialize buffers to hold the body uniforms on the CPU. */
     if (unifInitializeAligned(&aligned, bodyNum, sizeof(BodyUniforms)) != 0) {
         unifFinalizeBuffers(&bodyUniformBuffers, &bodyUniformBuffersMemory);
         unifFinalizeBuffers(&sceneUniformBuffers, &sceneUniformBuffersMemory);
@@ -425,7 +509,6 @@ int initializeUniforms() {
 /* Releases the resources backing all of the uniform machinery. */
 void finalizeUniforms() {
     descFinalize(&desc);
-    /* New: Finalize the buffers to hold the body uniforms. */
     unifFinalizeAligned(&aligned);
     unifFinalizeBuffers(&bodyUniformBuffers, &bodyUniformBuffersMemory);
     unifFinalizeBuffers(&sceneUniformBuffers, &sceneUniformBuffersMemory);
@@ -665,16 +748,12 @@ int initializeCommandBuffers() {
         vkCmdBindPipeline(
             connCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, 
             connGraphicsPipeline);
-        /* New: At the end of the call to bind the descriptor set, we pass along 
-        one offset into the body UBO. To clarify, the body UBO contains data for 
-        all of the bodies. What's really specific to one body versus another is 
-        this offset right here. */
+        /* Render a mesh with a body UBO. */
         uint32_t bodyUBOOffset = 0;
         vkCmdBindDescriptorSets(
             connCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, 
             connPipelineLayout, 0, 1, &(desc.descriptorSets[i]), 1, 
             &bodyUBOOffset);
-        /* Render a mesh. */
         VkDeviceSize offsets[] = {0};
         VkBuffer vertexBuffers[] = {meshVertBufA};
         vkCmdBindVertexBuffers(
@@ -683,14 +762,12 @@ int initializeCommandBuffers() {
             connCommandBuffers[i], meshTriBufA, 0, VK_INDEX_TYPE_UINT16);
         vkCmdDrawIndexed(
             connCommandBuffers[i], (uint32_t)(meshNumTrisA * 3), 1, 0, 0, 0);
-        /* New: We again pass an offset into the body UBO, incremented to 
-        indicate the next body. */
+        /* Render another mesh with another body UBO. */
         bodyUBOOffset += unifAlignment(sizeof(BodyUniforms));
         vkCmdBindDescriptorSets(
             connCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, 
             connPipelineLayout, 0, 1, &(desc.descriptorSets[i]), 1, 
             &bodyUBOOffset);
-        /* Render another mesh. */
         vertexBuffers[0] = meshVertBufB;
         vkCmdBindVertexBuffers(
             connCommandBuffers[i], 0, 1, vertexBuffers, offsets);
@@ -793,7 +870,7 @@ int presentFrame() {
         vkWaitForFences(
             vul.device, 1, &swap.imagesInFlight[imageIndex], VK_TRUE, 
             UINT64_MAX);
-    /* New: Send data to the scene and body UBOs in the shaders. */
+    /* Send data to the scene and body UBOs in the shaders. */
     setSceneUniforms(imageIndex);
     setBodyUniforms(imageIndex);
     /* Prepare to submit a request to render the new frame. */
