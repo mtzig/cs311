@@ -294,6 +294,7 @@ void mat44Viewport(float width, float height, float view[4][4]){
 
 /* Inverse to the matrix produced by mat44Viewport. */
 void mat44InverseViewport(float width, float height, float view[4][4]){
+    mat44Zero(view);
     view[0][0] = 2/width;
     view[0][3] = -1;
 
