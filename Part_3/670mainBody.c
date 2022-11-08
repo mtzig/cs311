@@ -4,104 +4,127 @@ Thomas Zeng & Kyosuke
 
 
 /* On macOS, compile with...
-    clang 640mainSpheres.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
-On Ubuntu, compile with...
-    cc 640mainSpheres.c 040pixel.o -lglfw -lGL -lm -ldl
+    clang 670mainBody.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
+
 */
 #include <stdio.h>
 #include <math.h>
 #include <GLFW/glfw3.h>
 #include "040pixel.h"
 
-#include "250vector.c"
+#include "650vector.c"
 #include "280matrix.c"
+#include "150texture.c"
 #include "300isometry.c"
 #include "300camera.c"
-#include "640ray.c"
+#include "660ray.c"
+#include "670body.c"
+#include "670sphere.c"
 
 #define SCREENWIDTH 512
 #define SCREENHEIGHT 512
 
 
 
-/*** SPHERES ******************************************************************/
-
-/* Given a sphere of radius r, centered at the origin in its local coordinates. 
-Given a modeling isometry that places that sphere in the scene. Given a ray 
-x(t) = p + t d in world coordinates. Outputs a rayIntersection, whose t member 
-is the least t, in the interval [rayEPSILON, bound], when the ray intersects the 
-sphere. If there is no such t, then the t member is instead rayNONE. */
-void getIntersection(
-        double r, const isoIsometry *isom, const double p[3], const double d[3], 
-        double bound, rayIntersection* inter) {
-
-    // code of Josh
-    double c[3];
-    vecCopy(3, isom->translation, c);
-    double pMinusC[3], dPMinusC, dD, rSq, disc, t;
-    vecSubtract(3, p, c, pMinusC);
-    dPMinusC = vecDot(3, d, pMinusC);
-    dD = vecDot(3, d, d);
-    rSq = r * r;
-    disc = dPMinusC * dPMinusC - dD * (vecDot(3, pMinusC, pMinusC) - rSq);
-    if (disc <= 0) {
-        inter->t = rayNONE;
-        return;
-    }
-    disc = sqrt(disc);
-    t = (-dPMinusC - disc) / dD;
-    if (rayEPSILON <= t && t <= bound) {
-        inter->t = t;
-        return;
-    }
-    t = (-dPMinusC + disc) / dD;
-    if (rayEPSILON <= t && t <= bound) {
-
-        inter->t = t;
-        return;
-    }
-
-    inter->t = rayNONE;
-}
-
 
 
 /*** ARTWORK ******************************************************************/
 
+/* Based on the uniforms, textures, rayIntersection, and texture coordinates, 
+outputs a material. */
+void getMaterial(
+        int unifDim, const double unif[], int texNum, const texTexture *tex[], 
+        const rayIntersection *inter, const double texCoords[2], 
+        rayMaterial *material){
+    
+    texSample(tex[0], texCoords[0], texCoords[1], material->cDiffuse);
+    material->hasAmbient = 1;
+    material->hasDiffuse = 0;
+    material->hasMirror = 0;
+    material->hasSpecular = 0;
+    material->hasTransmission = 0;
+
+}
+
 camCamera camera;
 double cameraTarget[3] = {0.0, 0.0, 0.0};
 double cameraRho = 10.0, cameraPhi = M_PI / 3.0, cameraTheta = M_PI / 3.0;
+texTexture texture;
+texTexture *textures[1] = {&texture};
+texTexture **tex = textures;
 
 /* Four spheres. */
 #define BODYNUM 4
-isoIsometry isoms[BODYNUM];
-double radii[BODYNUM] = {1.0, 0.5, 0.5, 0.5};
-double colors[BODYNUM][3] = {
-    {1.0, 1.0, 1.0}, 
-    {1.0, 0.0, 0.0}, 
-    {0.0, 1.0, 0.0}, 
-    {0.0, 0.0, 1.0}};
+bodyBody bodies[4];
+
+double cAmbient[3] = {0.5, 0.5, 0.5};
 
 int initializeArtwork(void) {
     camSetProjectionType(&camera, camPERSPECTIVE);
     camSetFrustum(
         &camera, M_PI / 6.0, cameraRho, 10.0, SCREENWIDTH, SCREENHEIGHT);
     camLookAt(&camera, cameraTarget, cameraRho, cameraPhi, cameraTheta);
-    double rot[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
-    for (int k = 0; k < BODYNUM; k += 1)
-        isoSetRotation(&(isoms[k]), rot);
+
+
+    if (bodyInitialize(&bodies[0], 1, 0, 1, &sphGetIntersection, &sphGetTexCoordsAndNormal, &getMaterial)!= 0){
+
+        return 5;
+    }
+    if (bodyInitialize(&bodies[1], 1, 0, 1, &sphGetIntersection, &sphGetTexCoordsAndNormal, &getMaterial)!= 0){
+        bodyFinalize(&bodies[0]);
+
+        return 4;
+
+    }
+    if (bodyInitialize(&bodies[2], 1, 0, 1, &sphGetIntersection, &sphGetTexCoordsAndNormal, &getMaterial)!= 0){
+        bodyFinalize(&bodies[0]);
+        bodyFinalize(&bodies[1]);
+
+        return 3;
+    }
+    if (bodyInitialize(&bodies[3], 1, 0, 1, &sphGetIntersection, &sphGetTexCoordsAndNormal, &getMaterial)!= 0){
+        bodyFinalize(&bodies[0]);
+        bodyFinalize(&bodies[1]);
+        bodyFinalize(&bodies[2]);
+
+        return 2;
+    }
+
     double transl[3] = {0.0, 0.0, 0.0};
-    isoSetTranslation(&(isoms[0]), transl);
+    isoSetTranslation(&(bodies[0].isometry), transl);
     vec3Set(1.0, 0.0, 0.0, transl);
-    isoSetTranslation(&(isoms[1]), transl);
+    isoSetTranslation(&(bodies[1].isometry), transl);
     vec3Set(0.0, 1.0, 0.0, transl);
-    isoSetTranslation(&(isoms[2]), transl);
+    isoSetTranslation(&(bodies[2].isometry), transl);
     vec3Set(0.0, 0.0, 1.0, transl);
-    isoSetTranslation(&(isoms[3]), transl);
+    isoSetTranslation(&(bodies[3].isometry), transl);
+
+    double radii[BODYNUM] = {1.0, 0.5, 0.5, 0.5};
+    for(int i=0; i<BODYNUM; i++){
+        bodies[i].textures = tex;
+        bodySetGeometryUniforms(&bodies[i], 0, radii + i, 1);
+    }
+
+    if (texInitializeFile(&texture, "kanagawa.jpeg") != 0) {
+        bodyFinalize(&bodies[0]);
+        bodyFinalize(&bodies[1]);
+        bodyFinalize(&bodies[2]);
+        bodyFinalize(&bodies[3]);
+
+		return 1;
+	}
+
+
     return 0;
 }
 
 void finalizeArtwork(void) {
+
+    bodyFinalize(&bodies[0]);
+    bodyFinalize(&bodies[1]);
+    bodyFinalize(&bodies[2]);
+    bodyFinalize(&bodies[3]);
+    texFinalize(&texture);
     return;
 }
 
@@ -111,30 +134,46 @@ void finalizeArtwork(void) {
 
 /* Given a ray x(t) = p + t d. Finds the color where that ray hits the scene (or 
 the background) and loads the color into the rgb parameter. */
-void getSceneColor(const double p[3], const double d[3], double rgb[3]) {
-    /* YOUR CODE GOES HERE. (MINE IS 16 LINES.) */
+void getSceneColor(
+        int bodyNum, const bodyBody bodies[], const double p[3], 
+        const double d[3], double rgb[3]) {
 
     // loops through every body
     double bound = rayINFINITY;
-    rayIntersection ray;
+    rayIntersection ray, minRay;
+    int minIdx = -1;
 
-    int sphereIdx = -1;
     for(int i=0; i<BODYNUM; i++){
-        getIntersection(radii[i], &isoms[i], p, d, bound, &ray);
+        bodyGetIntersection(&bodies[i], p, d, bound, &ray);
 
         // update bounds (if ray hit body)
         if(ray.t != rayNONE){
+            minRay = ray; // store ray that is closest
             bound = ray.t;
-            sphereIdx = i;
+            minIdx = i;
         }
     }
 
-    if(sphereIdx == -1){
+    if(minIdx == -1){
         double background[3] = {0.0, 0.0, 0.0};
         vecCopy(3, background, rgb);
     }
-    else
-        vecCopy(3, colors[sphereIdx], rgb);
+    else{
+
+        ray.t = bound; //need to set t to correct value
+
+        double texCoords[2], normal[3], sample[3];
+
+
+        bodyGetTexCoordsAndNormal(&bodies[minIdx], p, d, &minRay, texCoords, normal); 
+
+        rayMaterial material;
+        bodyGetMaterial(&bodies[minIdx], &minRay, texCoords, &material);
+
+
+        if(material.hasAmbient)
+            vecModulate(3, material.cDiffuse, cAmbient, rgb);
+    }
 
     
 
@@ -183,13 +222,11 @@ void render(void) {
 
             /* Set the pixel to the color of that ray. */
             double rgb[3];
-            getSceneColor(p, d, rgb);
+            getSceneColor(BODYNUM, bodies, p, d, rgb);
             pixSetRGB(i, j, rgb[0], rgb[1], rgb[2]);
         }
     }
 }
-
-
 
 /*** USER INTERFACE ***********************************************************/
 
@@ -227,7 +264,7 @@ void handleTimeStep(double oldTime, double newTime) {
     double rotMatrix[3][3];
     mat33AngleAxisRotation(newTime, rotAxis, rotMatrix);
     for (int k = 0; k < BODYNUM; k += 1)
-        isoSetRotation(&(isoms[k]), rotMatrix);
+        isoSetRotation(&(bodies[k].isometry), rotMatrix);
     render();
 }
 

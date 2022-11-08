@@ -4,20 +4,20 @@ Thomas Zeng & Kyosuke
 
 
 /* On macOS, compile with...
-    clang 640mainSpheres.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
-On Ubuntu, compile with...
-    cc 640mainSpheres.c 040pixel.o -lglfw -lGL -lm -ldl
+    clang 660mainMaterial.c 040pixel.o -lglfw -framework OpenGL -framework Cocoa -framework IOKit
+
 */
 #include <stdio.h>
 #include <math.h>
 #include <GLFW/glfw3.h>
 #include "040pixel.h"
 
-#include "250vector.c"
+#include "650vector.c"
 #include "280matrix.c"
+#include "150texture.c"
 #include "300isometry.c"
 #include "300camera.c"
-#include "640ray.c"
+#include "660ray.c"
 
 #define SCREENWIDTH 512
 #define SCREENHEIGHT 512
@@ -68,19 +68,34 @@ void getIntersection(
 
 /*** ARTWORK ******************************************************************/
 
+/* Based on the uniforms, textures, rayIntersection, and texture coordinates, 
+outputs a material. */
+void getMaterial(
+        int unifDim, const double unif[], int texNum, const texTexture *tex[], 
+        const rayIntersection *inter, const double texCoords[2], 
+        rayMaterial *material){
+    
+    texSample(tex[0], texCoords[0], texCoords[1], material->cDiffuse);
+    material->hasAmbient = 1;
+    material->hasDiffuse = 0;
+    material->hasMirror = 0;
+    material->hasSpecular = 0;
+    material->hasTransmission = 0;
+
+}
+
 camCamera camera;
 double cameraTarget[3] = {0.0, 0.0, 0.0};
 double cameraRho = 10.0, cameraPhi = M_PI / 3.0, cameraTheta = M_PI / 3.0;
+texTexture texture;
+const texTexture *textures[1] = {&texture};
+const texTexture **tex = textures;
 
 /* Four spheres. */
 #define BODYNUM 4
 isoIsometry isoms[BODYNUM];
 double radii[BODYNUM] = {1.0, 0.5, 0.5, 0.5};
-double colors[BODYNUM][3] = {
-    {1.0, 1.0, 1.0}, 
-    {1.0, 0.0, 0.0}, 
-    {0.0, 1.0, 0.0}, 
-    {0.0, 0.0, 1.0}};
+double cAmbient[3] = {0.5, 0.5, 0.5};
 
 int initializeArtwork(void) {
     camSetProjectionType(&camera, camPERSPECTIVE);
@@ -98,16 +113,52 @@ int initializeArtwork(void) {
     isoSetTranslation(&(isoms[2]), transl);
     vec3Set(0.0, 0.0, 1.0, transl);
     isoSetTranslation(&(isoms[3]), transl);
+
+    if (texInitializeFile(&texture, "kanagawa.jpeg") != 0) {
+		return 1;
+	}
+
+
     return 0;
 }
 
 void finalizeArtwork(void) {
+    texFinalize(&texture);
     return;
 }
 
 
 
 /*** RENDERING ****************************************************************/
+
+/* Given the sphere that just produced the given rayIntersection. Outputs the 
+sphere's texture coordinates at the intersection point. Also outputs the 
+sphere's unit outward-pointing normal vector there, in world coordinates. */
+void getTexCoordsAndNormal(
+        double r, const isoIsometry *isom, const double p[3], const double d[3], 
+        const rayIntersection* inter, double texCoords[2], double normal[3]){
+
+
+    double x[3];
+    vecScale(3, inter->t, d, x);
+    vecAdd(3, p, x, x);
+
+    vecSubtract(3, x, isom->translation, normal);
+    vecUnit(3, normal, normal);
+
+    double x_untrans[3], x_local[3];
+    isoUntransformPoint(isom, x, x_untrans);
+    isoUnrotateDirection(isom, x_untrans, x_local);
+
+    double rho, phi, theta;
+
+    vec3Rectangular(x_local, &rho, &phi, &theta);
+
+    texCoords[0] = theta / (2*M_PI); // S
+    texCoords[1] = 1 - phi / M_PI; // T
+
+
+}
 
 /* Given a ray x(t) = p + t d. Finds the color where that ray hits the scene (or 
 the background) and loads the color into the rgb parameter. */
@@ -133,8 +184,21 @@ void getSceneColor(const double p[3], const double d[3], double rgb[3]) {
         double background[3] = {0.0, 0.0, 0.0};
         vecCopy(3, background, rgb);
     }
-    else
-        vecCopy(3, colors[sphereIdx], rgb);
+    else{
+
+        ray.t = bound; //need to set t to correct value
+
+        double texCoords[2], normal[3], sample[3];
+        getTexCoordsAndNormal(radii[sphereIdx], &isoms[sphereIdx], p, d, &ray, texCoords, normal);
+
+
+        rayMaterial material;
+        getMaterial(0, NULL, 1, tex, &ray, texCoords, &material);
+
+
+        if(material.hasAmbient)
+            vecModulate(3, material.cDiffuse, cAmbient, rgb);
+    }
 
     
 
@@ -188,8 +252,6 @@ void render(void) {
         }
     }
 }
-
-
 
 /*** USER INTERFACE ***********************************************************/
 
