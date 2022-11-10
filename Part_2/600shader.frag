@@ -37,8 +37,8 @@ void main() {
     vec4 uCam = normalize(dCam);
     vec4 uLight1 = normalize(dLight);
 
-    vec4 uRefl = 2 * (uNorm * scene.uLight) * uNorm - scene.uLight;
-    vec4 uRefl1 = 2 * (uNorm * uLight1) * uNorm - uLight1;
+    vec4 uRefl = 2 * (dot(uNorm, scene.uLight)) * uNorm - scene.uLight;
+    vec4 uRefl1 = 2 * (dot(uNorm, uLight1)) * uNorm - uLight1;
 
 
     float iDiff = max(0.0, dot(uNorm, scene.uLight));
