@@ -542,9 +542,11 @@ void handleTimeStep(double oldTime, double newTime) {
     double rotMatrix[3][3];
     mat33AngleAxisRotation(newTime, rotAxis, rotMatrix);
 
-    // last two body i.e. plane and resh is stationary
-    for (int k = 0; k < BODYNUM-2; k += 1)
+    for (int k = 0; k < BODYNUM; k += 1){
+        if(k == 4) //plane is stationary 
+            continue;
         isoSetRotation(&(bodies[k].isometry), rotMatrix);
+    }
     render();
 }
 
